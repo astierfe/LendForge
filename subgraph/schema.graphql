@@ -1,0 +1,101 @@
+# subgraph/schema.graphql - v2.0 - Pour LendingPoolV2
+
+type User @entity(immutable: false) {
+  id: ID!
+  positions: [Position!]! @derivedFrom(field: "user")
+  totalCollateral: BigInt!
+  totalBorrowed: BigInt!
+  activePositions: Int!
+  lifetimeDeposits: BigInt!
+  lifetimeBorrows: BigInt!
+  lifetimeRepayments: BigInt!
+  liquidationCount: Int!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+}
+
+type Position @entity(immutable: false) {
+  id: ID!
+  user: User!
+  collateral: BigInt!
+  borrowed: BigInt!
+  collateralRatio: BigInt!
+  healthFactor: BigDecimal!
+  status: PositionStatus!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  closedAt: BigInt
+  transactions: [Transaction!]! @derivedFrom(field: "position")
+}
+
+enum PositionStatus {
+  ACTIVE
+  REPAID
+  LIQUIDATED
+}
+
+type Transaction @entity(immutable: false) {
+  id: ID!
+  position: Position!
+  user: User!
+  type: TransactionType!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+  gasUsed: BigInt
+}
+
+enum TransactionType {
+  DEPOSIT
+  BORROW
+  REPAY
+  WITHDRAW
+  LIQUIDATION
+}
+
+type DailyMetric @entity(immutable: false) {
+  id: ID!
+  date: Int!
+  tvl: BigInt!
+  totalBorrowed: BigInt!
+  utilizationRate: BigDecimal!
+  activeUsers: Int!
+  activePositions: Int!
+  depositsCount: Int!
+  borrowsCount: Int!
+  repaymentsCount: Int!
+  liquidationsCount: Int!
+  volumeDeposited: BigInt!
+  volumeBorrowed: BigInt!
+  volumeRepaid: BigInt!
+}
+
+type GlobalMetric @entity(immutable: false) {
+  id: ID!
+  totalUsers: Int!
+  totalPositions: Int!
+  activePositions: Int!
+  totalVolumeDeposited: BigInt!
+  totalVolumeBorrowed: BigInt!
+  totalVolumeRepaid: BigInt!
+  totalLiquidations: Int!
+  currentTVL: BigInt!
+  currentBorrowed: BigInt!
+  allTimeHighTVL: BigInt!
+  allTimeHighBorrowed: BigInt!
+  updatedAt: BigInt!
+}
+
+type Liquidation @entity(immutable: false) {
+  id: ID!
+  position: Position!
+  user: User!
+  liquidator: Bytes!
+  debtCleared: BigInt!
+  collateralSeized: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+  healthFactorBefore: BigDecimal!
+}

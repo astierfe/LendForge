@@ -1,0 +1,20 @@
+{
+  "name": "chainstaker-v2-subgraph",
+  "version": "2.0.0",
+  "description": "The Graph subgraph for ChainStaker V2 LendingPoolV2",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --studio chainstaker-v2",
+    "create-local": "graph create --node http://localhost:8020/ chainstaker-v2",
+    "remove-local": "graph remove --node http://localhost:8020/ chainstaker-v2",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 chainstaker-v2",
+    "test": "graph test"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.97.1",
+    "@graphprotocol/graph-ts": "^0.38.1",
+    "matchstick-as": "^0.6.0"
+  },
+  "type": "commonjs"
+}
