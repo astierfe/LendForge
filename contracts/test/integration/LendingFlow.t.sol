@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 import "lib/forge-std/src/Test.sol";
-import "../../contracts/LendingPoolV2.sol";
+import "../../LendingPoolV2.sol";
 
 contract MockOracle {
     int256 public price = 2000e8;

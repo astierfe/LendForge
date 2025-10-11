@@ -4,7 +4,7 @@
 pragma solidity ^0.8.24;
 
 import "lib/forge-std/src/Script.sol";
-import "../contracts/LendingPoolV2.sol";
+import "../LendingPoolV2.sol";
 
 // Mock Chainlink feed pour Sepolia (pas de vrai feed ETH/USD)
 contract MockChainlinkFeed {

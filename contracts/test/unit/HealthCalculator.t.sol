@@ -3,8 +3,8 @@
 pragma solidity ^0.8.24;
 
 import "lib/forge-std/src/Test.sol";
-import "../../contracts/libraries/HealthCalculator.sol";
-import "../../contracts/libraries/DataTypes.sol";
+import "../../libraries/HealthCalculator.sol";
+import "../../libraries/DataTypes.sol";
 
 contract HealthCalculatorTest is Test {
     function testHealthFactorHealthyPosition() public pure {
