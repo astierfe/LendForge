@@ -4,6 +4,8 @@
 pragma solidity ^0.8.24;
 
 import "../../interfaces/IUniswapV3Pool.sol";
+import "./MockChainlinkFeed.sol";
+
 
 contract MockUniswapV3Pool is IUniswapV3Pool {
     int24 public currentTick = 0;
@@ -11,7 +13,12 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
     int56 public tickCumulative1 = 0;
     
     // Prix USD stocké directement (évite conversion tick→price)
-    int256 public mockPriceUSD = 0; // 0 = pas de prix disponible
+    int256 public mockPriceUSD = 0;
+    MockChainlinkFeed public linkedChainlink;
+
+    function linkToChainlink(address _chainlink) external {
+        linkedChainlink = MockChainlinkFeed(_chainlink);
+    }
     
     function setMockPrice(int256 priceUSD) external {
         mockPriceUSD = priceUSD;
@@ -45,6 +52,14 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
     
     // Helper pour OracleAggregator (évite calcul tick→price)
     function getMockPrice() external view returns (int256) {
+        if (mockPriceUSD == 0 && address(linkedChainlink) != address(0)) {
+            try linkedChainlink.latestRoundData() returns (
+                uint80, int256 price, uint256, uint256, uint80
+            ) {
+                if (price > 0) return price;
+            } catch {}
+        }
+        
         return mockPriceUSD;
     }
 }

@@ -1,4 +1,4 @@
-// contracts/MockChainlinkFeed.sol - v1.0
+// contracts/mocks/MockChainlinkFeed.sol - v1.1
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
@@ -12,14 +12,14 @@ contract MockChainlinkFeed {
         _decimals = decimals_;
     }
     
-    function latestRoundData() external view returns (
+    function latestRoundData() public view returns (
         uint80 roundId,
         int256 answer,
         uint256 startedAt,
         uint256 updatedAt_,
         uint80 answeredInRound
     ) {
-        return (1, price, block.timestamp, updatedAt, 1);
+        return (1, price, updatedAt, updatedAt, 1);
     }
     
     function decimals() external view returns (uint8) {
