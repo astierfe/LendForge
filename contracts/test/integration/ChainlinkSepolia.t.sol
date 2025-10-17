@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
+import "lib/forge-std/src/Test.sol";
 import "../../oracles/ChainlinkPriceProvider.sol";
 import "../../oracles/mocks/MockUSDCPriceProvider.sol";
 import "../../oracles/mocks/MockDAIPriceProvider.sol";
