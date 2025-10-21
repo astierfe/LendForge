@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "lib/forge-std/src/Script.sol";
+import "forge-std/Script.sol";
 import "../token/LFTKN.sol";
 
 contract DeployLFTKN is Script {

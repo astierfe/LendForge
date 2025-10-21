@@ -1,6 +1,7 @@
 # foundry.toml - v1.0
 
 [profile.default]
+fs_permissions = [{ access = "read-write", path = "./" }]
 src = "contracts"
 out = "out"
 libs = ["lib"]
