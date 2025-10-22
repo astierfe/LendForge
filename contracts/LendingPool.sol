@@ -1,38 +1,35 @@
-// contracts/LendingPoolV2.sol - v2.0
-// Lending pool avec nouveau système d'oracles
+// contracts/LendingPool.sol - v3.0
+// Lending pool multi-collateral from scratch
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 import "./interfaces/ILendingPool.sol";
 import "./OracleAggregator.sol";
+import "./CollateralManager.sol";
 import "./libraries/HealthCalculator.sol";
 import "./libraries/DataTypes.sol";
 
-contract LendingPoolV2 is ILendingPool {
+contract LendingPool is ILendingPool {
     // ============ State Variables ============
     
-    // Oracle aggregator pour tous les prix
     OracleAggregator public immutable oracle;
+    CollateralManager public collateralManager;
     
-    // Positions des utilisateurs
+    // User borrowed amounts only (collateral in CollateralManager)
     mapping(address => DataTypes.Position) public positions;
     
-    // Totaux globaux
-    uint256 public totalCollateral;
     uint256 public totalBorrowed;
     
-    // Collateral asset (ETH address)
-    address public constant COLLATERAL_ASSET = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14; // WETH
-    
-    // Admin
     address public owner;
     bool public paused;
     
     // ============ Constructor ============
     
-    constructor(address _oracle) {
+    constructor(address _oracle, address _collateralManager) {
         if (_oracle == address(0)) revert InvalidAddress();
+        if (_collateralManager == address(0)) revert InvalidAddress();
         oracle = OracleAggregator(_oracle);
+        collateralManager = CollateralManager(payable(_collateralManager));
         owner = msg.sender;
     }
     
@@ -64,14 +61,8 @@ contract LendingPoolV2 is ILendingPool {
         external 
         payable 
         whenNotPaused 
-        nonZeroAmount(msg.value) 
     {
-        DataTypes.Position storage position = positions[msg.sender];
-        
-        position.collateralAmount += msg.value;
-        totalCollateral += msg.value;
-        
-        emit CollateralDeposited(msg.sender, msg.value, block.timestamp);
+        revert("Use CollateralManager.depositETH()");
     }
     
     function borrow(uint256 amount) 
@@ -82,23 +73,16 @@ contract LendingPoolV2 is ILendingPool {
     {
         DataTypes.Position storage position = positions[msg.sender];
         
-        if (position.collateralAmount == 0) revert InsufficientCollateral();
+        // Get total collateral value from CollateralManager
+        uint256 collateralValueUSD = collateralManager.getCollateralValueUSD(msg.sender);
         
-        // Get collateral value in USD via oracle
-        int256 price = oracle.getPrice(COLLATERAL_ASSET);
-        require(price > 0, "Invalid price");
+        if (collateralValueUSD == 0) revert InsufficientCollateral();
         
-        uint256 collateralValueUSD = HealthCalculator.convertETHtoUSD(
-            position.collateralAmount,
-            uint256(price)
-        );
+        // Check if new borrow exceeds max borrow capacity
+        uint256 maxBorrow = collateralManager.getMaxBorrowValue(msg.sender);
+        uint256 newTotalDebt = position.borrowedAmount + amount;
         
-        // Check if new borrow exceeds LTV
-        if (HealthCalculator.exceedsLTV(
-            collateralValueUSD,
-            position.borrowedAmount,
-            amount
-        )) {
+        if (newTotalDebt > maxBorrow) {
             revert ExceedsLTV();
         }
         
@@ -112,6 +96,10 @@ contract LendingPoolV2 is ILendingPool {
         );
         
         emit Borrowed(msg.sender, amount, healthFactor);
+        
+        // Transfer borrowed amount to user
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "ETH transfer failed");
     }
     
     function repay() 
@@ -133,6 +121,7 @@ contract LendingPoolV2 is ILendingPool {
         
         emit Repaid(msg.sender, repayAmount, position.borrowedAmount);
         
+        // Refund excess
         if (msg.value > repayAmount) {
             uint256 excess = msg.value - repayAmount;
             (bool success, ) = payable(msg.sender).call{value: excess}("");
@@ -140,43 +129,11 @@ contract LendingPoolV2 is ILendingPool {
         }
     }
     
-    function withdrawCollateral(uint256 amount) 
+    function withdrawCollateral(uint256 /* amount */) 
         external 
-        whenNotPaused 
-        nonZeroAmount(amount) 
+        pure
     {
-        DataTypes.Position storage position = positions[msg.sender];
-        
-        if (amount > position.collateralAmount) revert InsufficientCollateral();
-        
-        // If user has debt, check LTV after withdrawal
-        if (position.borrowedAmount > 0) {
-            uint256 remainingCollateral = position.collateralAmount - amount;
-            
-            int256 price = oracle.getPrice(COLLATERAL_ASSET);
-            require(price > 0, "Invalid price");
-            
-            uint256 remainingValueUSD = HealthCalculator.convertETHtoUSD(
-                remainingCollateral,
-                uint256(price)
-            );
-            
-            if (HealthCalculator.exceedsLTV(
-                remainingValueUSD,
-                position.borrowedAmount,
-                0
-            )) {
-                revert ExceedsLTV();
-            }
-        }
-        
-        position.collateralAmount -= amount;
-        totalCollateral -= amount;
-        
-        emit CollateralWithdrawn(msg.sender, amount);
-        
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        require(success, "ETH transfer failed");
+        revert("Use CollateralManager.withdrawETH() or withdrawERC20()");
     }
     
     function liquidate(address user) 
@@ -191,14 +148,10 @@ contract LendingPoolV2 is ILendingPool {
         
         if (position.borrowedAmount == 0) revert NoDebt();
         
-        int256 price = oracle.getPrice(COLLATERAL_ASSET);
-        require(price > 0, "Invalid price");
+        // Get total collateral value
+        uint256 collateralValueUSD = collateralManager.getCollateralValueUSD(user);
         
-        uint256 collateralValueUSD = HealthCalculator.convertETHtoUSD(
-            position.collateralAmount,
-            uint256(price)
-        );
-        
+        // Check if liquidatable
         if (!HealthCalculator.isLiquidatable(
             collateralValueUSD,
             position.borrowedAmount
@@ -209,31 +162,26 @@ contract LendingPoolV2 is ILendingPool {
         uint256 debtToCover = position.borrowedAmount;
         require(msg.value >= debtToCover, "Insufficient payment");
         
-        uint256 collateralToSeize = HealthCalculator.calculateLiquidationAmount(
-            debtToCover,
-            uint256(price)
+        // Calculate total collateral to seize (with bonus)
+        uint256 collateralToSeizeUSD = _calculateLiquidationCollateralUSD(
+            debtToCover
         );
         
-        if (collateralToSeize > position.collateralAmount) {
-            collateralToSeize = position.collateralAmount;
-        }
-        
+        // Clear user's debt
         position.borrowedAmount = 0;
-        position.collateralAmount -= collateralToSeize;
-        
         totalBorrowed -= debtToCover;
-        totalCollateral -= collateralToSeize;
         
-        emit Liquidated(msg.sender, user, debtToCover, collateralToSeize);
+        emit Liquidated(msg.sender, user, debtToCover, collateralToSeizeUSD);
         
-        (bool success, ) = payable(msg.sender).call{value: collateralToSeize}("");
-        require(success, "Collateral transfer failed");
-        
+        // Refund excess payment
         if (msg.value > debtToCover) {
             uint256 excess = msg.value - debtToCover;
             (bool refundSuccess, ) = payable(msg.sender).call{value: excess}("");
             require(refundSuccess, "Refund failed");
         }
+        
+        // Note: Liquidator must call CollateralManager to claim seized collateral
+        // This event signals which collateral can be seized
     }
     
     // ============ View Functions ============
@@ -245,7 +193,7 @@ contract LendingPoolV2 is ILendingPool {
     {
         DataTypes.Position storage pos = positions[user];
         return Position({
-            collateralAmount: pos.collateralAmount,
+            collateralAmount: 0, // Stored in CollateralManager
             borrowedAmount: pos.borrowedAmount,
             lastInterestUpdate: pos.lastInterestUpdate,
             accumulatedInterest: pos.accumulatedInterest
@@ -262,7 +210,7 @@ contract LendingPoolV2 is ILendingPool {
             return type(uint256).max;
         }
         
-        uint256 collateralValueUSD = _getCollateralValueUSD(user);
+        uint256 collateralValueUSD = collateralManager.getCollateralValueUSD(user);
         
         return HealthCalculator.calculateHealthFactor(
             collateralValueUSD,
@@ -274,7 +222,7 @@ contract LendingPoolV2 is ILendingPool {
         external 
         returns (uint256) 
     {
-        return _getCollateralValueUSD(user);
+        return collateralManager.getCollateralValueUSD(user);
     }
     
     function getCurrentBorrowRate() 
@@ -285,25 +233,42 @@ contract LendingPoolV2 is ILendingPool {
         return DataTypes.BASE_RATE;
     }
     
+    function getBorrowedAmount(address user) external view returns (uint256) {
+        return positions[user].borrowedAmount;
+    }
+    
+    function getMaxBorrowAmount(address user) external returns (uint256) {
+        uint256 maxBorrow = collateralManager.getMaxBorrowValue(user);
+        uint256 currentDebt = positions[user].borrowedAmount;
+        
+        if (maxBorrow <= currentDebt) return 0;
+        
+        return maxBorrow - currentDebt;
+    }
+    
+    function getUserCollaterals(address user) external view returns (
+        address[] memory assets,
+        uint256[] memory amounts
+    ) {
+        (assets, amounts, ) = collateralManager.getUserCollaterals(user);
+    }
+    
     // ============ Internal Helpers ============
     
-    function _getCollateralValueUSD(address user) 
-        internal 
-        returns (uint256) 
-    {
-        uint256 collateralAmount = positions[user].collateralAmount;
-        if (collateralAmount == 0) return 0;
-        
-        int256 price = oracle.getPrice(COLLATERAL_ASSET);
-        require(price > 0, "Invalid price");
-        
-        return HealthCalculator.convertETHtoUSD(
-            collateralAmount,
-            uint256(price)
-        );
+    function _calculateLiquidationCollateralUSD(
+        uint256 debtRepaid
+    ) internal pure returns (uint256) {
+        // Apply liquidation bonus (10%)
+        uint256 bonus = (debtRepaid * DataTypes.LIQUIDATION_BONUS) / 100;
+        return debtRepaid + bonus;
     }
     
     // ============ Admin Functions ============
+    
+    function setCollateralManager(address _manager) external onlyOwner {
+        if (_manager == address(0)) revert InvalidAddress();
+        collateralManager = CollateralManager(payable(_manager));
+    }
     
     function pause() external onlyOwner {
         paused = true;
@@ -318,9 +283,15 @@ contract LendingPoolV2 is ILendingPool {
         owner = newOwner;
     }
     
+    function emergencyWithdraw() external onlyOwner {
+        uint256 balance = address(this).balance;
+        (bool success, ) = payable(owner).call{value: balance}("");
+        require(success, "Emergency withdraw failed");
+    }
+    
     // ============ Receive ETH ============
     
     receive() external payable {
-        revert("Use depositCollateral()");
+        // Accept ETH for repayments and liquidations
     }
 }

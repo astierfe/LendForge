@@ -1,5 +1,5 @@
-// test/unit/MockETHFallback.t.sol - v1.0
-// Tests du mock fallback et scenarios de deviation
+// test/unit/MockETHFallback.t.sol - v1.1
+// Tests for fallback provider with OracleAggregator v3.1
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
@@ -58,7 +58,9 @@ contract MockETHFallbackTest is Test {
         fallbackProvider.setPrice(2575e8);
         
         int256 price = aggregator.getPrice(ETH_ADDRESS);
-        assertEq(price, 2500e8);
+        
+        // v3.1: Deviation 3% < 5% → Use Chainlink (primary)
+        assertEq(price, 2500e8, "Should use Chainlink (primary)");
         
         (bool hasDev, uint256 devBps,,) = aggregator.getDeviationInfo(ETH_ADDRESS);
         assertTrue(hasDev);
@@ -72,11 +74,16 @@ contract MockETHFallbackTest is Test {
         emit DeviationWarning(ETH_ADDRESS, 2500e8, 2650e8, 600);
         
         int256 price = aggregator.getPrice(ETH_ADDRESS);
-        assertEq(price, 2500e8);
+        
+        // v3.1 FIX: Deviation 6% > 5% → Use Fallback!
+        assertEq(price, 2650e8, "Should use Fallback (deviation > 5%)");
         
         (bool hasDev, uint256 devBps,,) = aggregator.getDeviationInfo(ETH_ADDRESS);
         assertTrue(hasDev);
         assertEq(devBps, 600);
+        
+        // Should NOT trigger emergency (< 10%)
+        assertFalse(aggregator.emergencyMode(), "Should not be in emergency");
     }
     
     function test_Deviation_Critical_12Percent() public {
@@ -85,9 +92,11 @@ contract MockETHFallbackTest is Test {
         vm.expectEmit(true, false, false, false);
         emit CriticalDeviation(ETH_ADDRESS, 2500e8, 2800e8, 1200);
         
-        aggregator.getPrice(ETH_ADDRESS);
+        int256 price = aggregator.getPrice(ETH_ADDRESS);
         
-        assertTrue(aggregator.emergencyMode());
+        // v3.1 FIX: Deviation 12% > 10% → Use Fallback + Emergency
+        assertEq(price, 2800e8, "Should use Fallback");
+        assertTrue(aggregator.emergencyMode(), "Should activate emergency mode");
         
         (bool hasDev, uint256 devBps,,) = aggregator.getDeviationInfo(ETH_ADDRESS);
         assertTrue(hasDev);
@@ -99,7 +108,7 @@ contract MockETHFallbackTest is Test {
         fallbackProvider.setPrice(2600e8);
         
         int256 price = aggregator.getPrice(ETH_ADDRESS);
-        assertEq(price, 2600e8);
+        assertEq(price, 2600e8, "Should use Fallback when primary fails");
     }
     
     function test_Scenario_MarketCrash() public {
@@ -110,17 +119,19 @@ contract MockETHFallbackTest is Test {
         emit CriticalDeviation(ETH_ADDRESS, 2000e8, 2500e8, 2500);
         
         int256 price = aggregator.getPrice(ETH_ADDRESS);
-        assertEq(price, 2000e8);
         
-        assertTrue(aggregator.emergencyMode());
+        // v3.1 FIX: Deviation 25% > 10% → Use Fallback (TWAP protects users)
+        assertEq(price, 2500e8, "Should use Fallback (TWAP smooths crash)");
+        assertTrue(aggregator.emergencyMode(), "Should activate emergency mode");
     }
     
     function test_Scenario_FallbackStale() public {
         vm.warp(block.timestamp + 25 hours);
         
         int256 price = aggregator.getPrice(ETH_ADDRESS);
-        assertEq(price, 2500e8);
         
+        // Fallback stale, should use only primary
+        assertEq(price, 2500e8, "Should use primary when fallback stale");
         assertFalse(fallbackProvider.isHealthy());
     }
 }

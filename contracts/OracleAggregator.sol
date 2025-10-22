@@ -64,6 +64,12 @@ contract OracleAggregator {
         int256 fallbackPrice,
         uint256 deviationBps
     );
+    event FallbackUsed(
+        address indexed asset,
+        int256 fallbackPrice,
+        uint256 deviationBps,
+        string reason
+    );
     event EmergencyModeSet(bool enabled, string reason);
     event CacheCleared(address indexed asset);
     
@@ -102,7 +108,7 @@ contract OracleAggregator {
     ) {
         CachedPrice memory cached = priceCache[asset];
         
-        // Check if cache exists (was never set or was cleared)
+        // Check if cache exists
         if (cached.updatedAt == 0) {
             revert CacheStale();
         }
@@ -115,10 +121,10 @@ contract OracleAggregator {
         return (cached.price, cached.updatedAt, cached.source);
     }
     
-    // Update price and cache
+    // Update price and cache with SMART fallback
     function _updateAndGetPrice(address asset) internal returns (int256) {
         address primaryProvider = registry.getPrimaryProvider(asset);
-        address fallbackProvider = registry.getFallbackProvider(asset);
+        address secondaryProvider = registry.getFallbackProvider(asset);
         
         int256 primaryPrice;
         bool primarySuccess = false;
@@ -131,38 +137,87 @@ contract OracleAggregator {
             }
         } catch {}
         
-        int256 fallbackPrice;
-        bool fallbackSuccess = false;
+        int256 secondaryPrice;
+        bool secondarySuccess = false;
         
         // Try fallback if exists
-        if (fallbackProvider != address(0)) {
-            try IPriceProvider(fallbackProvider).getPrice() returns (int256 price) {
+        if (secondaryProvider != address(0)) {
+            try IPriceProvider(secondaryProvider).getPrice() returns (int256 price) {
                 if (price > 0) {
-                    fallbackPrice = price;
-                    fallbackSuccess = true;
+                    secondaryPrice = price;
+                    secondarySuccess = true;
                 }
             } catch {}
         }
         
-        // Both available - check deviation
-        if (primarySuccess && fallbackSuccess && deviationChecksEnabled) {
-            _checkDeviation(asset, primaryPrice, fallbackPrice);
-        } else {
-            // Clear deviation if only one source
-            deviations[asset].hasDeviation = false;
-        }
-        
-        // Determine final price and source
+        // Determine final price with SMART logic
         int256 finalPrice;
         string memory source;
         
-        if (primarySuccess) {
+        // Case 1: Both available - check deviation and choose
+        if (primarySuccess && secondarySuccess && deviationChecksEnabled) {
+            uint256 deviation = _calculateDeviation(primaryPrice, secondaryPrice);
+            
+            // Store deviation data
+            deviations[asset] = DeviationData({
+                hasDeviation: true,
+                deviationBps: deviation,
+                primaryPrice: primaryPrice,
+                fallbackPrice: secondaryPrice,
+                timestamp: block.timestamp
+            });
+            
+            emit PricesCached(asset, primaryPrice, secondaryPrice);
+            
+            // CRITICAL FIX: Choose price based on deviation
+            if (deviation >= CRITICAL_DEVIATION) {
+                // 10%+ deviation → Use fallback + Emergency mode
+                finalPrice = secondaryPrice;
+                source = string(abi.encodePacked(
+                    IPriceProvider(secondaryProvider).description(),
+                    " (EMERGENCY)"
+                ));
+                
+                emergencyMode = true;
+                emit EmergencyModeSet(true, "Critical price deviation detected");
+                emit CriticalDeviation(asset, primaryPrice, secondaryPrice, deviation);
+                emit FallbackUsed(asset, secondaryPrice, deviation, "Critical deviation");
+                
+            } else if (deviation > MAX_DEVIATION) {
+                // 5-10% deviation → Use fallback + Warning
+                finalPrice = secondaryPrice;
+                source = string(abi.encodePacked(
+                    IPriceProvider(secondaryProvider).description(),
+                    " (DEVIATION)"
+                ));
+                
+                emit DeviationWarning(asset, primaryPrice, secondaryPrice, deviation);
+                emit FallbackUsed(asset, secondaryPrice, deviation, "Deviation threshold exceeded");
+                
+            } else {
+                // < 5% deviation → Use primary (normal)
+                finalPrice = primaryPrice;
+                source = IPriceProvider(primaryProvider).description();
+            }
+            
+        } 
+        // Case 2: Only primary available
+        else if (primarySuccess) {
             finalPrice = primaryPrice;
             source = IPriceProvider(primaryProvider).description();
-        } else if (fallbackSuccess) {
-            finalPrice = fallbackPrice;
-            source = IPriceProvider(fallbackProvider).description();
-        } else {
+            deviations[asset].hasDeviation = false;
+        } 
+        // Case 3: Only fallback available (primary failed)
+        else if (secondarySuccess) {
+            finalPrice = secondaryPrice;
+            source = string(abi.encodePacked(
+                IPriceProvider(secondaryProvider).description(),
+                " (PRIMARY FAILED)"
+            ));
+            emit FallbackUsed(asset, secondaryPrice, 0, "Primary provider failed");
+        } 
+        // Case 4: Both failed
+        else {
             revert PriceRegistry.AllProvidersFailed();
         }
         
@@ -175,38 +230,7 @@ contract OracleAggregator {
         
         emit PriceUpdated(asset, finalPrice, source, block.timestamp);
         
-        if (primarySuccess && fallbackSuccess) {
-            emit PricesCached(asset, primaryPrice, fallbackPrice);
-        }
-        
         return finalPrice;
-    }
-    
-    // Check deviation between primary and fallback
-    function _checkDeviation(
-        address asset,
-        int256 primaryPrice,
-        int256 fallbackPrice
-    ) internal {
-        uint256 deviation = _calculateDeviation(primaryPrice, fallbackPrice);
-        
-        // Store deviation data
-        deviations[asset] = DeviationData({
-            hasDeviation: true,
-            deviationBps: deviation,
-            primaryPrice: primaryPrice,
-            fallbackPrice: fallbackPrice,
-            timestamp: block.timestamp
-        });
-        
-        // Check thresholds
-        if (deviation >= CRITICAL_DEVIATION) {
-            emit CriticalDeviation(asset, primaryPrice, fallbackPrice, deviation);
-            emergencyMode = true;
-            emit EmergencyModeSet(true, "Critical price deviation detected");
-        } else if (deviation > MAX_DEVIATION) {
-            emit DeviationWarning(asset, primaryPrice, fallbackPrice, deviation);
-        }
     }
     
     // Calculate deviation in basis points
