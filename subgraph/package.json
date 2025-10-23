@@ -1,14 +1,14 @@
 {
-  "name": "chainstaker-v2-subgraph",
-  "version": "2.0.0",
-  "description": "The Graph subgraph for ChainStaker V2 LendingPoolV2",
+  "name": "lendforge-v3-subgraph",
+  "version": "3.0.0",
+  "description": "The Graph subgraph for LendForge v3.0 Multi-Collateral System",
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy": "graph deploy --studio chainstaker-v2",
-    "create-local": "graph create --node http://localhost:8020/ chainstaker-v2",
-    "remove-local": "graph remove --node http://localhost:8020/ chainstaker-v2",
-    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 chainstaker-v2",
+    "deploy": "graph deploy lendforge-v-3",
+    "create-local": "graph create --node http://localhost:8020/ lendforge-v-3",
+    "remove-local": "graph remove --node http://localhost:8020/ lendforge-v-3",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 lendforge-v-3",
     "test": "graph test"
   },
   "devDependencies": {

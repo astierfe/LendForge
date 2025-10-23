@@ -1,12 +1,10 @@
-// subgraph/src/lending-pool.ts - v2.1 - Fix status transitions
-import { BigDecimal, BigInt } from "@graphprotocol/graph-ts"
+// subgraph/src/lending-pool.ts - v3.0 - Multi-collateral support
+import { BigDecimal, BigInt, Bytes } from "@graphprotocol/graph-ts"
 import {
-  CollateralDeposited,
   Borrowed,
   Repaid,
-  CollateralWithdrawn,
   Liquidated
-} from "../generated/LendingPoolV2/LendingPoolV2"
+} from "../generated/LendingPool/LendingPool"
 import {
   User,
   Position,
@@ -16,435 +14,240 @@ import {
   Liquidation
 } from "../generated/schema"
 
-const LIQUIDATION_THRESHOLD = BigDecimal.fromString("0.83")
 const ZERO_BD = BigDecimal.fromString("0")
+const ZERO_BI = BigInt.zero()
 
 function getOrCreateUser(address: string, timestamp: BigInt): User {
   let user = User.load(address)
-  
+
   if (!user) {
     user = new User(address)
-    user.totalCollateral = BigInt.zero()
-    user.totalBorrowed = BigInt.zero()
+    user.totalCollateralUSD = ZERO_BI
+    user.totalBorrowed = ZERO_BI
     user.activePositions = 0
-    user.lifetimeDeposits = BigInt.zero()
-    user.lifetimeBorrows = BigInt.zero()
-    user.lifetimeRepayments = BigInt.zero()
+    user.lifetimeDeposits = ZERO_BI
+    user.lifetimeBorrows = ZERO_BI
+    user.lifetimeRepayments = ZERO_BI
     user.liquidationCount = 0
     user.createdAt = timestamp
     user.updatedAt = timestamp
     user.save()
-    
+
     updateGlobalMetric(timestamp, "newUser")
   }
-  
+
   return user
 }
 
 function getOrCreatePosition(userId: string, timestamp: BigInt): Position {
   let positionId = userId
   let position = Position.load(positionId)
-  
+
   if (!position) {
     position = new Position(positionId)
     position.user = userId
-    position.collateral = BigInt.zero()
-    position.borrowed = BigInt.zero()
-    position.collateralRatio = BigInt.zero()
-    position.healthFactor = BigDecimal.fromString("999999")
+    position.totalCollateralUSD = ZERO_BI
+    position.borrowed = ZERO_BI
+    position.healthFactor = BigDecimal.fromString("999.99")
     position.status = "ACTIVE"
     position.createdAt = timestamp
     position.updatedAt = timestamp
     position.save()
-    
+
     updateGlobalMetric(timestamp, "newPosition")
   }
-  
+
   return position
 }
 
-function calculateHealthFactor(collateral: BigInt, borrowed: BigInt): BigDecimal {
-  if (borrowed.equals(BigInt.zero())) {
-    return BigDecimal.fromString("999999")
-  }
-  
-  let collateralBD = collateral.toBigDecimal()
-  let borrowedBD = borrowed.toBigDecimal()
-  
-  let adjustedCollateral = collateralBD.times(LIQUIDATION_THRESHOLD)
-  let healthFactor = adjustedCollateral.div(borrowedBD).times(BigDecimal.fromString("100"))
-  
-  return healthFactor
-}
-
-function updateDailyMetric(timestamp: BigInt, type: string, amount: BigInt): void {
-  let dayID = timestamp.toI32() / 86400
-  let id = dayID.toString()
-  
-  let metric = DailyMetric.load(id)
-  if (!metric) {
-    metric = new DailyMetric(id)
-    metric.date = dayID
-    metric.tvl = BigInt.zero()
-    metric.totalBorrowed = BigInt.zero()
-    metric.utilizationRate = ZERO_BD
-    metric.activeUsers = 0
-    metric.activePositions = 0
-    metric.depositsCount = 0
-    metric.borrowsCount = 0
-    metric.repaymentsCount = 0
-    metric.liquidationsCount = 0
-    metric.volumeDeposited = BigInt.zero()
-    metric.volumeBorrowed = BigInt.zero()
-    metric.volumeRepaid = BigInt.zero()
-  }
-  
-  if (type == "deposit") {
-    metric.depositsCount = metric.depositsCount + 1
-    metric.volumeDeposited = metric.volumeDeposited.plus(amount)
-  } else if (type == "borrow") {
-    metric.borrowsCount = metric.borrowsCount + 1
-    metric.volumeBorrowed = metric.volumeBorrowed.plus(amount)
-  } else if (type == "repay") {
-    metric.repaymentsCount = metric.repaymentsCount + 1
-    metric.volumeRepaid = metric.volumeRepaid.plus(amount)
-  } else if (type == "liquidation") {
-    metric.liquidationsCount = metric.liquidationsCount + 1
-  }
-  
-  let global = getOrCreateGlobalMetric()
-  metric.tvl = global.currentTVL
-  metric.totalBorrowed = global.currentBorrowed
-  
-  if (!metric.tvl.equals(BigInt.zero())) {
-    let tvlBD = metric.tvl.toBigDecimal()
-    let borrowedBD = metric.totalBorrowed.toBigDecimal()
-    metric.utilizationRate = borrowedBD.div(tvlBD)
-  }
-  
-  metric.save()
-}
-
-function getOrCreateGlobalMetric(): GlobalMetric {
-  let id = "global"
-  let metric = GlobalMetric.load(id)
-  
-  if (!metric) {
-    metric = new GlobalMetric(id)
-    metric.totalUsers = 0
-    metric.totalPositions = 0
-    metric.activePositions = 0
-    metric.totalVolumeDeposited = BigInt.zero()
-    metric.totalVolumeBorrowed = BigInt.zero()
-    metric.totalVolumeRepaid = BigInt.zero()
-    metric.totalLiquidations = 0
-    metric.currentTVL = BigInt.zero()
-    metric.currentBorrowed = BigInt.zero()
-    metric.allTimeHighTVL = BigInt.zero()
-    metric.allTimeHighBorrowed = BigInt.zero()
-    metric.updatedAt = BigInt.zero()
-  }
-  
-  return metric
-}
-
 function updateGlobalMetric(timestamp: BigInt, action: string): void {
-  let metric = getOrCreateGlobalMetric()
-  
-  if (action == "newUser") {
-    metric.totalUsers = metric.totalUsers + 1
-  } else if (action == "newPosition") {
-    metric.totalPositions = metric.totalPositions + 1
-    metric.activePositions = metric.activePositions + 1
-  } else if (action == "closePosition") {
-    metric.activePositions = metric.activePositions - 1
-  } else if (action == "reactivatePosition") {
-    metric.activePositions = metric.activePositions + 1
+  let globalId = "global"
+  let global = GlobalMetric.load(globalId)
+
+  if (!global) {
+    global = new GlobalMetric(globalId)
+    global.totalUsers = 0
+    global.totalPositions = 0
+    global.activePositions = 0
+    global.totalVolumeDeposited = ZERO_BI
+    global.totalVolumeBorrowed = ZERO_BI
+    global.totalVolumeRepaid = ZERO_BI
+    global.totalLiquidations = 0
+    global.currentTVL = ZERO_BI
+    global.currentBorrowed = ZERO_BI
+    global.allTimeHighTVL = ZERO_BI
+    global.allTimeHighBorrowed = ZERO_BI
+    global.totalETHDeposited = ZERO_BI
+    global.totalUSDCDeposited = ZERO_BI
+    global.totalDAIDeposited = ZERO_BI
   }
-  
-  metric.updatedAt = timestamp
-  metric.save()
+
+  if (action == "newUser") {
+    global.totalUsers = global.totalUsers + 1
+  } else if (action == "newPosition") {
+    global.totalPositions = global.totalPositions + 1
+    global.activePositions = global.activePositions + 1
+  }
+
+  global.updatedAt = timestamp
+  global.save()
 }
 
-export function handleCollateralDeposited(event: CollateralDeposited): void {
-  let user = getOrCreateUser(event.params.user.toHex(), event.block.timestamp)
-  let position = getOrCreatePosition(user.id, event.block.timestamp)
-  
-  // FIX: Force ACTIVE si collateral ajouté
-  let wasRepaid = position.status == "REPAID"
-  
-  position.collateral = position.collateral.plus(event.params.amount)
-  position.updatedAt = event.block.timestamp
-  position.status = "ACTIVE"
-  
-  // FIX: Ne pas recalculer HF ici (prix oracle inconnu)
-  // Le bot lira HF on-chain directement
-  // Garder dernier HF connu ou placeholder si aucun borrow
-  if (position.borrowed.equals(BigInt.zero())) {
-    position.healthFactor = BigDecimal.fromString("999999")
-    position.collateralRatio = BigInt.zero()
-  }
-  // Si borrowed > 0, garder HF précédent (sera mis à jour au prochain borrow/repay)
-  
-  position.save()
-  
-  // Reactiver compteur si position était fermée
-  if (wasRepaid) {
-    updateGlobalMetric(event.block.timestamp, "reactivatePosition")
-  }
-  
-  user.totalCollateral = user.totalCollateral.plus(event.params.amount)
-  user.lifetimeDeposits = user.lifetimeDeposits.plus(event.params.amount)
-  user.updatedAt = event.block.timestamp
-  user.save()
-  
-  let txId = event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  let tx = new Transaction(txId)
-  tx.position = position.id
-  tx.user = user.id
-  tx.type = "DEPOSIT"
-  tx.amount = event.params.amount
-  tx.timestamp = event.block.timestamp
-  tx.blockNumber = event.block.number
-  tx.txHash = event.transaction.hash
-  tx.gasUsed = event.transaction.gasLimit
-  tx.save()
-  
-  let global = getOrCreateGlobalMetric()
-  global.currentTVL = global.currentTVL.plus(event.params.amount)
-  global.totalVolumeDeposited = global.totalVolumeDeposited.plus(event.params.amount)
-  
-  if (global.currentTVL.gt(global.allTimeHighTVL)) {
-    global.allTimeHighTVL = global.currentTVL
-  }
-  
-  global.updatedAt = event.block.timestamp
-  global.save()
-  
-  updateDailyMetric(event.block.timestamp, "deposit", event.params.amount)
+function createTransaction(
+  position: Position,
+  user: User,
+  type: string,
+  amount: BigInt,
+  timestamp: BigInt,
+  txHash: string,
+  blockNumber: BigInt
+): void {
+  let txId = txHash + "-" + type + "-" + blockNumber.toString()
+  let transaction = new Transaction(txId)
+
+  transaction.position = position.id
+  transaction.user = user.id
+  transaction.type = type
+  transaction.amount = amount
+  transaction.timestamp = timestamp
+  transaction.blockNumber = blockNumber
+  transaction.txHash = Bytes.fromHexString(txHash)
+
+  transaction.save()
 }
 
 export function handleBorrowed(event: Borrowed): void {
-  let user = getOrCreateUser(event.params.user.toHex(), event.block.timestamp)
+  let user = getOrCreateUser(event.params.user.toHexString(), event.block.timestamp)
   let position = getOrCreatePosition(user.id, event.block.timestamp)
-  
-  // FIX: Force ACTIVE si dette ajoutée
-  let wasRepaid = position.status == "REPAID"
-  
+
+  // Update position
   position.borrowed = position.borrowed.plus(event.params.amount)
-  
-  // FIX: Utiliser healthFactor de l'event au lieu de le calculer
   position.healthFactor = BigDecimal.fromString(event.params.healthFactor.toString()).div(BigDecimal.fromString("100"))
-  position.status = "ACTIVE"
-  
-  if (!position.borrowed.equals(BigInt.zero())) {
-    position.collateralRatio = position.collateral.times(BigInt.fromI32(100)).div(position.borrowed)
-  }
-  
   position.updatedAt = event.block.timestamp
   position.save()
-  
-  // Reactiver compteur si position était fermée
-  if (wasRepaid) {
-    updateGlobalMetric(event.block.timestamp, "reactivatePosition")
-  }
-  
+
+  // Update user
   user.totalBorrowed = user.totalBorrowed.plus(event.params.amount)
   user.lifetimeBorrows = user.lifetimeBorrows.plus(event.params.amount)
   user.updatedAt = event.block.timestamp
   user.save()
-  
-  let txId = event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  let tx = new Transaction(txId)
-  tx.position = position.id
-  tx.user = user.id
-  tx.type = "BORROW"
-  tx.amount = event.params.amount
-  tx.timestamp = event.block.timestamp
-  tx.blockNumber = event.block.number
-  tx.txHash = event.transaction.hash
-  tx.gasUsed = event.transaction.gasLimit
-  tx.save()
-  
-  let global = getOrCreateGlobalMetric()
-  global.currentBorrowed = global.currentBorrowed.plus(event.params.amount)
+
+  // Create transaction
+  createTransaction(
+    position,
+    user,
+    "BORROW",
+    event.params.amount,
+    event.block.timestamp,
+    event.transaction.hash.toHexString(),
+    event.block.number
+  )
+
+  // Update global metrics
+  let global = GlobalMetric.load("global")!
   global.totalVolumeBorrowed = global.totalVolumeBorrowed.plus(event.params.amount)
-  
+  global.currentBorrowed = global.currentBorrowed.plus(event.params.amount)
   if (global.currentBorrowed.gt(global.allTimeHighBorrowed)) {
     global.allTimeHighBorrowed = global.currentBorrowed
   }
-  
   global.updatedAt = event.block.timestamp
   global.save()
-  
-  updateDailyMetric(event.block.timestamp, "borrow", event.params.amount)
 }
 
 export function handleRepaid(event: Repaid): void {
-  let user = User.load(event.params.user.toHex())
-  if (!user) return
-  
-  let position = Position.load(user.id)
-  if (!position) return
-  
-  position.borrowed = position.borrowed.minus(event.params.amount)
-  
-  // FIX: Déterminer status basé sur collateral ET borrowed
-  if (position.borrowed.equals(BigInt.zero())) {
-    position.healthFactor = BigDecimal.fromString("999999")
-    position.collateralRatio = BigInt.zero()
-    
-    // Position fermée seulement si debt=0 ET collateral=0
-    if (position.collateral.equals(BigInt.zero())) {
-      position.status = "REPAID"
-      position.closedAt = event.block.timestamp
-      updateGlobalMetric(event.block.timestamp, "closePosition")
-    } else {
-      // Collateral reste, position ACTIVE
-      position.status = "ACTIVE"
-    }
-  } else {
-    // Debt existe, position forcément ACTIVE
-    // Ne pas recalculer HF sans prix réel
-    // Garder HF précédent, bot lira on-chain
-    position.status = "ACTIVE"
-  }
-  
+  let user = getOrCreateUser(event.params.user.toHexString(), event.block.timestamp)
+  let position = getOrCreatePosition(user.id, event.block.timestamp)
+
+  // Update position
+  position.borrowed = event.params.remainingDebt
   position.updatedAt = event.block.timestamp
+
+  if (event.params.remainingDebt.equals(ZERO_BI)) {
+    position.status = "REPAID"
+    position.closedAt = event.block.timestamp
+
+    // Update active positions count
+    let global = GlobalMetric.load("global")!
+    global.activePositions = global.activePositions - 1
+    global.save()
+  }
+
   position.save()
-  
-  user.totalBorrowed = user.totalBorrowed.minus(event.params.amount)
+
+  // Update user
+  user.totalBorrowed = event.params.remainingDebt
   user.lifetimeRepayments = user.lifetimeRepayments.plus(event.params.amount)
   user.updatedAt = event.block.timestamp
   user.save()
-  
-  let txId = event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  let tx = new Transaction(txId)
-  tx.position = position.id
-  tx.user = user.id
-  tx.type = "REPAY"
-  tx.amount = event.params.amount
-  tx.timestamp = event.block.timestamp
-  tx.blockNumber = event.block.number
-  tx.txHash = event.transaction.hash
-  tx.gasUsed = event.transaction.gasLimit
-  tx.save()
-  
-  let global = getOrCreateGlobalMetric()
-  global.currentBorrowed = global.currentBorrowed.minus(event.params.amount)
-  global.totalVolumeRepaid = global.totalVolumeRepaid.plus(event.params.amount)
-  global.updatedAt = event.block.timestamp
-  global.save()
-  
-  updateDailyMetric(event.block.timestamp, "repay", event.params.amount)
-}
 
-export function handleCollateralWithdrawn(event: CollateralWithdrawn): void {
-  let user = User.load(event.params.user.toHex())
-  if (!user) return
-  
-  let position = Position.load(user.id)
-  if (!position) return
-  
-  position.collateral = position.collateral.minus(event.params.amount)
-  
-  // FIX: Déterminer status basé sur collateral ET borrowed
-  // Ne pas recalculer HF (bot le fera on-chain)
-  if (!position.borrowed.equals(BigInt.zero())) {
-    position.status = "ACTIVE"
-    // Garder HF précédent, sera mis à jour au prochain borrow/repay
-  } else if (position.collateral.equals(BigInt.zero())) {
-    // Ni collateral ni dette, position fermée
-    position.status = "REPAID"
-    position.healthFactor = BigDecimal.fromString("999999")
-    position.closedAt = event.block.timestamp
-    updateGlobalMetric(event.block.timestamp, "closePosition")
-  } else {
-    // Collateral reste mais pas de dette, reste ACTIVE
-    position.status = "ACTIVE"
-    position.healthFactor = BigDecimal.fromString("999999")
-  }
-  
-  position.updatedAt = event.block.timestamp
-  position.save()
-  
-  user.totalCollateral = user.totalCollateral.minus(event.params.amount)
-  user.updatedAt = event.block.timestamp
-  user.save()
-  
-  let txId = event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  let tx = new Transaction(txId)
-  tx.position = position.id
-  tx.user = user.id
-  tx.type = "WITHDRAW"
-  tx.amount = event.params.amount
-  tx.timestamp = event.block.timestamp
-  tx.blockNumber = event.block.number
-  tx.txHash = event.transaction.hash
-  tx.gasUsed = event.transaction.gasLimit
-  tx.save()
-  
-  let global = getOrCreateGlobalMetric()
-  global.currentTVL = global.currentTVL.minus(event.params.amount)
+  // Create transaction
+  createTransaction(
+    position,
+    user,
+    "REPAY",
+    event.params.amount,
+    event.block.timestamp,
+    event.transaction.hash.toHexString(),
+    event.block.number
+  )
+
+  // Update global metrics
+  let global = GlobalMetric.load("global")!
+  global.totalVolumeRepaid = global.totalVolumeRepaid.plus(event.params.amount)
+  global.currentBorrowed = global.currentBorrowed.minus(event.params.amount)
   global.updatedAt = event.block.timestamp
   global.save()
 }
 
 export function handleLiquidated(event: Liquidated): void {
-  let user = User.load(event.params.user.toHex())
-  if (!user) return
-  
-  let position = Position.load(user.id)
-  if (!position) return
-  
-  let healthFactorBefore = position.healthFactor
-  
-  position.borrowed = BigInt.zero()
-  position.collateral = position.collateral.minus(event.params.collateralSeized)
-  position.healthFactor = BigDecimal.fromString("999999")
-  position.collateralRatio = BigInt.zero()
+  let user = getOrCreateUser(event.params.user.toHexString(), event.block.timestamp)
+  let position = getOrCreatePosition(user.id, event.block.timestamp)
+
+  // Update position
   position.status = "LIQUIDATED"
   position.closedAt = event.block.timestamp
+  position.borrowed = ZERO_BI
+  position.totalCollateralUSD = ZERO_BI
   position.updatedAt = event.block.timestamp
   position.save()
-  
-  user.totalBorrowed = user.totalBorrowed.minus(event.params.debtRepaid)
-  user.totalCollateral = user.totalCollateral.minus(event.params.collateralSeized)
+
+  // Update user
+  user.totalBorrowed = ZERO_BI
+  user.totalCollateralUSD = ZERO_BI
   user.liquidationCount = user.liquidationCount + 1
   user.updatedAt = event.block.timestamp
   user.save()
-  
-  let txId = event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  let tx = new Transaction(txId)
-  tx.position = position.id
-  tx.user = user.id
-  tx.type = "LIQUIDATION"
-  tx.amount = event.params.debtRepaid
-  tx.timestamp = event.block.timestamp
-  tx.blockNumber = event.block.number
-  tx.txHash = event.transaction.hash
-  tx.gasUsed = event.transaction.gasLimit
-  tx.save()
-  
-  let liquidation = new Liquidation(txId)
+
+  // Create liquidation record
+  let liquidationId = event.transaction.hash.toHexString() + "-" + event.block.number.toString()
+  let liquidation = new Liquidation(liquidationId)
   liquidation.position = position.id
   liquidation.user = user.id
   liquidation.liquidator = event.params.liquidator
-  liquidation.debtCleared = event.params.debtRepaid
-  liquidation.collateralSeized = event.params.collateralSeized
+  liquidation.debtRepaid = event.params.debtRepaid
+  liquidation.collateralSeizedUSD = event.params.collateralSeized  // Now in USD
   liquidation.timestamp = event.block.timestamp
   liquidation.blockNumber = event.block.number
   liquidation.txHash = event.transaction.hash
-  liquidation.healthFactorBefore = healthFactorBefore
+  liquidation.healthFactorBefore = BigDecimal.fromString("0.99")  // Below 1.0
   liquidation.save()
-  
-  let global = getOrCreateGlobalMetric()
-  global.currentTVL = global.currentTVL.minus(event.params.collateralSeized)
-  global.currentBorrowed = global.currentBorrowed.minus(event.params.debtRepaid)
+
+  // Create transaction
+  createTransaction(
+    position,
+    user,
+    "LIQUIDATION",
+    event.params.debtRepaid,
+    event.block.timestamp,
+    event.transaction.hash.toHexString(),
+    event.block.number
+  )
+
+  // Update global metrics
+  let global = GlobalMetric.load("global")!
   global.totalLiquidations = global.totalLiquidations + 1
+  global.activePositions = global.activePositions - 1
+  global.currentBorrowed = global.currentBorrowed.minus(event.params.debtRepaid)
   global.updatedAt = event.block.timestamp
   global.save()
-  
-  updateGlobalMetric(event.block.timestamp, "closePosition")
-  updateDailyMetric(event.block.timestamp, "liquidation", event.params.debtRepaid)
 }

@@ -6,11 +6,14 @@ from typing import Optional
 @dataclass
 class Position:
     user_address: str
-    collateral: int  # wei
+    collateral_amount: int  # USD with 8 decimals (multi-collateral total)
     borrowed: int  # USD with 8 decimals
     health_factor: Decimal
-    collateral_ratio: int
     status: str
+
+    # Legacy field for backward compatibility
+    collateral: Optional[int] = None  # Deprecated
+    collateral_ratio: Optional[int] = None  # Deprecated
     
     # Calculated fields
     collateral_usd: Optional[Decimal] = None
@@ -23,19 +26,28 @@ class Position:
     def from_graph_response(cls, data: dict) -> "Position":
         return cls(
             user_address=data["user"]["id"],
-            collateral=int(data["collateral"]),
+            collateral_amount=int(data.get("totalCollateralUSD", data.get("collateral", 0))),
             borrowed=int(data["borrowed"]),
             health_factor=Decimal(data["healthFactor"]),
-            collateral_ratio=int(data["collateralRatio"]),
-            status=data["status"]
+            status=data["status"],
+            # Legacy fields for backward compatibility
+            collateral=int(data.get("collateral", 0)),
+            collateral_ratio=int(data.get("collateralRatio", 0))
         )
     
     def is_liquidatable(self) -> bool:
         return self.health_factor < Decimal("1.0")
     
+    def collateral_usd_decimal(self) -> Decimal:
+        """Get collateral value in USD (multi-collateral total)"""
+        return Decimal(self.collateral_amount) / Decimal(10**8)
+
     def collateral_eth(self) -> Decimal:
-        return Decimal(self.collateral) / Decimal(10**18)
-    
+        """Legacy method - use collateral_usd_decimal() for multi-collateral"""
+        if self.collateral:
+            return Decimal(self.collateral) / Decimal(10**18)
+        return Decimal(0)
+
     def borrowed_usd_decimal(self) -> Decimal:
         return Decimal(self.borrowed) / Decimal(10**8)
     

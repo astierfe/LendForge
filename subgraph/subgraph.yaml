@@ -4,36 +4,92 @@ indexerHints:
 schema:
   file: ./schema.graphql
 dataSources:
+  # ===== NEW: LendingPool v3.0 =====
   - kind: ethereum
-    name: LendingPoolV2
+    name: LendingPool
     network: sepolia
     source:
-      address: "0x16CbF8825A11eAa25DA636E5bC9202190D4E8c5B"
-      abi: LendingPoolV2
-      startBlock: 9355420
+      address: "0x06AF08708B45968492078A1900124DaA832082cD"  # NEW ADDRESS
+      abi: LendingPool
+      startBlock: 9362000  # UPDATE: Recent block after deployment
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.7
+      apiVersion: 0.0.8
       language: wasm/assemblyscript
       entities:
         - User
         - Position
         - Transaction
-        - DailyMetric
         - GlobalMetric
         - Liquidation
       abis:
-        - name: LendingPoolV2
-          file: ./abis/LendingPoolV2.json
+        - name: LendingPool
+          file: ./abis/LendingPool.json  # NEW ABI
       eventHandlers:
-        - event: CollateralDeposited(indexed address,uint256,uint256)
-          handler: handleCollateralDeposited
         - event: Borrowed(indexed address,uint256,uint256)
           handler: handleBorrowed
         - event: Repaid(indexed address,uint256,uint256)
           handler: handleRepaid
-        - event: CollateralWithdrawn(indexed address,uint256)
-          handler: handleCollateralWithdrawn
         - event: Liquidated(indexed address,indexed address,uint256,uint256)
           handler: handleLiquidated
       file: ./src/lending-pool.ts
+
+  # ===== NEW: CollateralManager v1.1 =====
+  - kind: ethereum
+    name: CollateralManager
+    network: sepolia
+    source:
+      address: "0x53Ea723AA0C4cd5eF459eE9351D3f9875D821758"  # NEW CONTRACT
+      abi: CollateralManager
+      startBlock: 9362000  # UPDATE: Recent block after deployment
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.8
+      language: wasm/assemblyscript
+      entities:
+        - User
+        - Position
+        - UserCollateral
+        - CollateralAsset
+        - Transaction
+        - GlobalMetric
+      abis:
+        - name: CollateralManager
+          file: ./abis/CollateralManager.json  # NEW ABI
+      eventHandlers:
+        - event: CollateralDeposited(indexed address,indexed address,uint256,uint256)
+          handler: handleCollateralDeposited
+        - event: CollateralWithdrawn(indexed address,indexed address,uint256,uint256)
+          handler: handleCollateralWithdrawn
+        - event: AssetAdded(indexed address,string,uint256,uint256,uint256)
+          handler: handleAssetAdded
+      file: ./src/collateral-manager.ts
+
+  # ===== NEW: OracleAggregator v3.1 =====
+  - kind: ethereum
+    name: OracleAggregator
+    network: sepolia
+    source:
+      address: "0x62f41B1EDc66bC46e05c34AC40B447E5A7ab3EAe"  # NEW CONTRACT
+      abi: OracleAggregator
+      startBlock: 9362000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.8
+      language: wasm/assemblyscript
+      entities:
+        - PriceDeviation
+      abis:
+        - name: OracleAggregator
+          file: ./abis/OracleAggregator.json  # NEW ABI
+      eventHandlers:
+        - event: DeviationWarning(indexed address,int256,int256,uint256)
+          handler: handleDeviationWarning
+        - event: CriticalDeviation(indexed address,int256,int256,uint256)
+          handler: handleCriticalDeviation
+        - event: EmergencyModeSet(bool,string)
+          handler: handleEmergencyModeSet
+      file: ./src/oracle-aggregator.ts
+
+# ===== REMOVED OLD DATASOURCE =====
+# LendingPoolV2 datasource - DELETED (0x16CbF8825A11eAa25DA636E5bC9202190D4E8c5B)

@@ -1,0 +1,208 @@
+# LendForge v3.0 Subgraph Validation Queries
+# These queries can be used to test the subgraph after deployment
+
+# 1. Get all users with their multi-collateral positions
+query GetAllUsersWithCollaterals {
+  users(first: 10, orderBy: createdAt, orderDirection: desc) {
+    id
+    totalCollateralUSD
+    totalBorrowed
+    activePositions
+    lifetimeDeposits
+    lifetimeBorrows
+    lifetimeRepayments
+    liquidationCount
+    createdAt
+    updatedAt
+    collaterals {
+      asset {
+        id
+        symbol
+        decimals
+        ltv
+        liquidationThreshold
+      }
+      amount
+      valueUSD
+      updatedAt
+    }
+    positions {
+      id
+      totalCollateralUSD
+      borrowed
+      healthFactor
+      status
+      createdAt
+      updatedAt
+    }
+  }
+}
+
+# 2. Get global metrics overview
+query GetGlobalMetrics {
+  globalMetrics(first: 1) {
+    id
+    totalUsers
+    totalPositions
+    activePositions
+    totalVolumeDeposited
+    totalVolumeBorrowed
+    totalVolumeRepaid
+    totalLiquidations
+    currentTVL
+    currentBorrowed
+    allTimeHighTVL
+    allTimeHighBorrowed
+    totalETHDeposited
+    totalUSDCDeposited
+    totalDAIDeposited
+    updatedAt
+  }
+}
+
+# 3. Get all supported collateral assets
+query GetCollateralAssets {
+  collateralAssets(orderBy: symbol) {
+    id
+    symbol
+    decimals
+    ltv
+    liquidationThreshold
+    enabled
+    totalDeposited
+  }
+}
+
+# 4. Get recent transactions by type
+query GetRecentTransactions {
+  transactions(first: 20, orderBy: timestamp, orderDirection: desc) {
+    id
+    user {
+      id
+    }
+    position {
+      id
+    }
+    type
+    asset
+    amount
+    timestamp
+    blockNumber
+    txHash
+  }
+}
+
+# 5. Get liquidations with details
+query GetLiquidations {
+  liquidations(first: 10, orderBy: timestamp, orderDirection: desc) {
+    id
+    user {
+      id
+    }
+    position {
+      id
+    }
+    liquidator
+    debtRepaid
+    collateralSeizedUSD
+    timestamp
+    blockNumber
+    txHash
+    healthFactorBefore
+  }
+}
+
+# 6. Get price deviations from oracle
+query GetPriceDeviations {
+  priceDeviations(first: 10, orderBy: timestamp, orderDirection: desc) {
+    id
+    asset
+    primaryPrice
+    fallbackPrice
+    deviationBps
+    timestamp
+    blockNumber
+    emergencyTriggered
+  }
+}
+
+# 7. Get user-specific collateral breakdown
+query GetUserCollaterals($userId: String!) {
+  user(id: $userId) {
+    id
+    totalCollateralUSD
+    totalBorrowed
+    collaterals {
+      asset {
+        id
+        symbol
+        decimals
+      }
+      amount
+      valueUSD
+      updatedAt
+    }
+    positions {
+      id
+      totalCollateralUSD
+      borrowed
+      healthFactor
+      status
+    }
+  }
+}
+
+# 8. Get transactions by asset type
+query GetTransactionsByAsset($assetAddress: Bytes!) {
+  transactions(
+    first: 20
+    where: { asset: $assetAddress }
+    orderBy: timestamp
+    orderDirection: desc
+  ) {
+    id
+    user {
+      id
+    }
+    type
+    asset
+    amount
+    timestamp
+    blockNumber
+  }
+}
+
+# 9. Get active positions with health factors
+query GetActivePositions {
+  positions(
+    first: 20
+    where: { status: "ACTIVE" }
+    orderBy: healthFactor
+  ) {
+    id
+    user {
+      id
+    }
+    totalCollateralUSD
+    borrowed
+    healthFactor
+    status
+    createdAt
+    updatedAt
+  }
+}
+
+# 10. Get daily metrics (if implemented)
+query GetDailyMetrics {
+  dailyMetrics(first: 30, orderBy: date, orderDirection: desc) {
+    id
+    date
+    totalDepositsUSD
+    totalBorrowsUSD
+    totalRepaymentsUSD
+    newUsers
+    activeUsers
+    liquidations
+    averageHealthFactor
+  }
+}

@@ -1,4 +1,4 @@
-# bot/src/services/position_monitor.py - v2.0 - Multi-collateral support
+# bot/src/services/position_monitor.py - v1.1 - On-chain fallback for HF
 from typing import List
 from clients.graph_client import GraphClient
 from clients.web3_client import Web3Client
@@ -39,53 +39,33 @@ class PositionMonitor:
         
         logger.info(f"Found {len(all_active_positions)} active positions to check")
         
-        # ENHANCED: Multi-collateral position checking with detailed analysis
+        # FIX: Vérifier HF on-chain pour chaque position
         liquidatable = []
         for position in all_active_positions:
+            # Récupérer HF réel on-chain
             try:
-                user_addr = position.user_address
-                logger.debug(f"Analyzing position {user_addr[:10]}...")
-
-                # Get multi-collateral data from contracts
-                collateral_usd, borrowed, last_update = self.web3_client.get_position_onchain(user_addr)
-                hf_raw = self.web3_client.get_health_factor(user_addr)
-                hf_onchain = Decimal(hf_raw) / Decimal(100) if hf_raw < 999999 else Decimal("999.99")
-
-                # Get detailed collateral breakdown
-                user_collaterals = self.web3_client.get_user_collaterals(user_addr)
-
-                # Update position with real on-chain data
+                hf_raw = self.web3_client.get_health_factor(position.user_address)
+                hf_onchain = Decimal(hf_raw) / Decimal(100)
+                
+                # Mettre à jour position avec HF réel
                 position.health_factor = hf_onchain
-                position.collateral_amount = collateral_usd
-                position.borrowed_amount = borrowed
-
-                # Enhanced logging with multi-collateral details
-                collateral_summary = ", ".join([
-                    f"{c['symbol']}:{c['amount'] / 10**Config.COLLATERAL_CONFIGS.get(c['asset'], {}).get('decimals', 18):.4f}"
-                    for c in user_collaterals
-                ]) if user_collaterals else "None"
-
+                
                 logger.info(
-                    f"Position {user_addr[:10]}... | "
-                    f"HF={hf_onchain:.2f} | "
-                    f"Collateral=${collateral_usd / 10**Config.USD_DECIMALS:.2f} | "
-                    f"Borrowed=${borrowed / 10**Config.USD_DECIMALS:.2f} | "
-                    f"Assets=[{collateral_summary}]"
+                    f"Position {position.user_address[:10]}... | "
+                    f"HF on-chain={hf_onchain:.2f} | "
+                    f"HF graph={position.health_factor:.2f}"
                 )
-
-                # Check if liquidatable
-                if hf_onchain < Decimal("1.0") and borrowed > 0:
+                
+                # Vérifier si liquidatable avec HF réel
+                if hf_onchain < Decimal("1.0"):
                     liquidatable.append(position)
                     logger.warning(
-                        f"🚨 [LIQUIDATABLE] Position {user_addr[:10]}... | "
-                        f"HF={hf_onchain:.2f} | "
-                        f"Value=${collateral_usd / 10**Config.USD_DECIMALS:.2f} | "
-                        f"Debt=${borrowed / 10**Config.USD_DECIMALS:.2f} | "
-                        f"Assets={len(user_collaterals)}"
+                        f"[ALERT] POSITION LIQUIDATABLE! "
+                        f"user={position.user_address[:10]}... HF={hf_onchain:.2f}"
                     )
-
+                    
             except Exception as e:
-                logger.error(f"Failed to analyze position {position.user_address[:10]}...: {e}")
+                logger.error(f"Failed to get on-chain HF for {position.user_address[:10]}...: {e}")
                 continue
         
         logger.info(f"Liquidatable positions (on-chain HF < 1.0): {len(liquidatable)}")
@@ -131,23 +111,21 @@ class PositionMonitor:
         query = gql("""
             query GetActivePositions {
                 positions(
-                    where: {
+                    where: { 
                         status: ACTIVE
                         borrowed_gt: "0"
                     }
-                    orderBy: updatedAt
-                    orderDirection: desc
                     first: 100
                 ) {
                     id
                     user {
                         id
                     }
-                    totalCollateralUSD
+                    collateral
                     borrowed
+                    collateralRatio
                     healthFactor
                     status
-                    updatedAt
                 }
             }
         """)
@@ -167,51 +145,6 @@ class PositionMonitor:
             logger.error(f"Failed to query active positions: {e}")
             return []
     
-    def analyze_multi_collateral_position(self, user_address: str) -> dict:
-        """
-        Analyze a position's multi-collateral composition and risk factors
-        """
-        try:
-            # Get comprehensive position data
-            collaterals = self.web3_client.get_user_collaterals(user_address)
-            collateral_usd = self.web3_client.get_collateral_value_usd(user_address)
-            max_borrow = self.web3_client.get_max_borrow_value(user_address)
-            _, borrowed, _ = self.web3_client.get_position_onchain(user_address)
-            hf = self.web3_client.get_health_factor(user_address)
-
-            # Calculate risk metrics
-            utilization = (borrowed / max_borrow * 100) if max_borrow > 0 else 0
-            liquidation_distance = (Decimal(hf) / 100 - 1) * 100  # % above liquidation
-
-            # Asset breakdown
-            asset_breakdown = []
-            for collateral in collaterals:
-                asset_config = Config.COLLATERAL_CONFIGS.get(collateral['asset'], {})
-                asset_breakdown.append({
-                    'symbol': collateral['symbol'],
-                    'amount': collateral['amount'] / 10**asset_config.get('decimals', 18),
-                    'ltv': asset_config.get('ltv', 0),
-                    'liquidation_threshold': asset_config.get('liquidation_threshold', 0)
-                })
-
-            return {
-                'user_address': user_address,
-                'health_factor': float(Decimal(hf) / 100),
-                'collateral_usd': collateral_usd / 10**Config.USD_DECIMALS,
-                'borrowed_usd': borrowed / 10**Config.USD_DECIMALS,
-                'max_borrow_usd': max_borrow / 10**Config.USD_DECIMALS,
-                'utilization_percent': utilization,
-                'liquidation_distance_percent': float(liquidation_distance),
-                'asset_count': len(collaterals),
-                'asset_breakdown': asset_breakdown,
-                'is_liquidatable': hf < 10000 and borrowed > 0,  # HF < 1.0
-                'risk_level': 'HIGH' if hf < 12000 else 'MEDIUM' if hf < 15000 else 'LOW'
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to analyze multi-collateral position {user_address}: {e}")
-            return {'error': str(e)}
-
     def get_status(self) -> dict:
         global_metrics = self.graph_client.get_global_metrics()
         if not global_metrics:

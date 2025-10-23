@@ -35,11 +35,11 @@ class GraphClient:
                     user {
                         id
                     }
-                    collateral
+                    totalCollateralUSD
                     borrowed
-                    collateralRatio
                     healthFactor
                     status
+                    updatedAt
                 }
             }
         """)
@@ -70,11 +70,11 @@ class GraphClient:
                     user {
                         id
                     }
-                    collateral
+                    totalCollateralUSD
                     borrowed
-                    collateralRatio
                     healthFactor
                     status
+                    updatedAt
                 }
             }
         """)

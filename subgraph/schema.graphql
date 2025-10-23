@@ -1,9 +1,10 @@
-# subgraph/schema.graphql - v2.0 - Pour LendingPoolV2
+# subgraph/schema.graphql - v3.0 - Multi-collateral schema
 
 type User @entity(immutable: false) {
   id: ID!
   positions: [Position!]! @derivedFrom(field: "user")
-  totalCollateral: BigInt!
+  collaterals: [UserCollateral!]! @derivedFrom(field: "user")
+  totalCollateralUSD: BigInt!
   totalBorrowed: BigInt!
   activePositions: Int!
   lifetimeDeposits: BigInt!
@@ -17,15 +18,36 @@ type User @entity(immutable: false) {
 type Position @entity(immutable: false) {
   id: ID!
   user: User!
-  collateral: BigInt!
-  borrowed: BigInt!
-  collateralRatio: BigInt!
+  totalCollateralUSD: BigInt!  # From CollateralManager
+  borrowed: BigInt!            # From LendingPool
   healthFactor: BigDecimal!
   status: PositionStatus!
   createdAt: BigInt!
   updatedAt: BigInt!
   closedAt: BigInt
   transactions: [Transaction!]! @derivedFrom(field: "position")
+}
+
+# NEW: Track individual collateral assets per user
+type UserCollateral @entity(immutable: false) {
+  id: ID!  # user-asset format
+  user: User!
+  asset: CollateralAsset!
+  amount: BigInt!
+  valueUSD: BigInt!
+  updatedAt: BigInt!
+}
+
+# NEW: Supported collateral assets
+type CollateralAsset @entity(immutable: false) {
+  id: ID!  # Asset address
+  symbol: String!
+  decimals: Int!
+  ltv: Int!  # Loan-to-value ratio
+  liquidationThreshold: Int!
+  enabled: Boolean!
+  totalDeposited: BigInt!
+  userCollaterals: [UserCollateral!]! @derivedFrom(field: "asset")
 }
 
 enum PositionStatus {
@@ -39,6 +61,7 @@ type Transaction @entity(immutable: false) {
   position: Position!
   user: User!
   type: TransactionType!
+  asset: Bytes  # NEW: Asset address for multi-collateral
   amount: BigInt!
   timestamp: BigInt!
   blockNumber: BigInt!
@@ -47,17 +70,19 @@ type Transaction @entity(immutable: false) {
 }
 
 enum TransactionType {
-  DEPOSIT
+  DEPOSIT_ETH      # NEW: Specific for ETH deposits
+  DEPOSIT_ERC20    # NEW: Specific for ERC20 deposits
   BORROW
   REPAY
-  WITHDRAW
+  WITHDRAW_ETH     # NEW: Specific for ETH withdrawals
+  WITHDRAW_ERC20   # NEW: Specific for ERC20 withdrawals
   LIQUIDATION
 }
 
 type DailyMetric @entity(immutable: false) {
   id: ID!
   date: Int!
-  tvl: BigInt!
+  totalTVL: BigInt!
   totalBorrowed: BigInt!
   utilizationRate: BigDecimal!
   activeUsers: Int!
@@ -69,6 +94,10 @@ type DailyMetric @entity(immutable: false) {
   volumeDeposited: BigInt!
   volumeBorrowed: BigInt!
   volumeRepaid: BigInt!
+  # NEW: Per-asset metrics
+  ethTVL: BigInt!
+  usdcTVL: BigInt!
+  daiTVL: BigInt!
 }
 
 type GlobalMetric @entity(immutable: false) {
@@ -84,6 +113,10 @@ type GlobalMetric @entity(immutable: false) {
   currentBorrowed: BigInt!
   allTimeHighTVL: BigInt!
   allTimeHighBorrowed: BigInt!
+  # NEW: Multi-collateral totals
+  totalETHDeposited: BigInt!
+  totalUSDCDeposited: BigInt!
+  totalDAIDeposited: BigInt!
   updatedAt: BigInt!
 }
 
@@ -92,10 +125,22 @@ type Liquidation @entity(immutable: false) {
   position: Position!
   user: User!
   liquidator: Bytes!
-  debtCleared: BigInt!
-  collateralSeized: BigInt!
+  debtRepaid: BigInt!
+  collateralSeizedUSD: BigInt!  # NEW: USD value
   timestamp: BigInt!
   blockNumber: BigInt!
   txHash: Bytes!
   healthFactorBefore: BigDecimal!
+}
+
+# NEW: Oracle deviation tracking
+type PriceDeviation @entity(immutable: false) {
+  id: ID!  # asset-timestamp
+  asset: Bytes!
+  primaryPrice: BigInt!
+  fallbackPrice: BigInt!
+  deviationBps: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  emergencyTriggered: Boolean!
 }

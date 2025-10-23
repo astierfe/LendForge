@@ -38,3 +38,5 @@ broadcast/
 
 _docs/
 lib/
+
+.claude/
