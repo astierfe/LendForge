@@ -11,7 +11,7 @@ dataSources:
     source:
       address: "0x06AF08708B45968492078A1900124DaA832082cD"  # NEW ADDRESS
       abi: LendingPool
-      startBlock: 9362000  # UPDATE: Recent block after deployment
+      startBlock: 9459666  # AssetAdded events block (3 events emitted)
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.8
@@ -41,7 +41,7 @@ dataSources:
     source:
       address: "0x53Ea723AA0C4cd5eF459eE9351D3f9875D821758"  # NEW CONTRACT
       abi: CollateralManager
-      startBlock: 9362000  # UPDATE: Recent block after deployment
+      startBlock: 9459666  # AssetAdded events block (3 events emitted)
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.8
@@ -72,7 +72,7 @@ dataSources:
     source:
       address: "0x62f41B1EDc66bC46e05c34AC40B447E5A7ab3EAe"  # NEW CONTRACT
       abi: OracleAggregator
-      startBlock: 9362000
+      startBlock: 9459666  # AssetAdded events block
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.8

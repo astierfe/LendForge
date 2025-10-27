@@ -168,7 +168,9 @@ export function handleRepaid(event: Repaid): void {
 
     // Update active positions count
     let global = GlobalMetric.load("global")!
-    global.activePositions = global.activePositions - 1
+    if (global.activePositions > 0) {
+      global.activePositions = global.activePositions - 1
+    }
     global.save()
   }
 
@@ -246,7 +248,9 @@ export function handleLiquidated(event: Liquidated): void {
   // Update global metrics
   let global = GlobalMetric.load("global")!
   global.totalLiquidations = global.totalLiquidations + 1
-  global.activePositions = global.activePositions - 1
+  if (global.activePositions > 0) {
+    global.activePositions = global.activePositions - 1
+  }
   global.currentBorrowed = global.currentBorrowed.minus(event.params.debtRepaid)
   global.updatedAt = event.block.timestamp
   global.save()

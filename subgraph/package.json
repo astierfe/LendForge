@@ -16,5 +16,8 @@
     "@graphprotocol/graph-ts": "^0.38.1",
     "matchstick-as": "^0.6.0"
   },
-  "type": "commonjs"
+  "type": "commonjs",
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
 }

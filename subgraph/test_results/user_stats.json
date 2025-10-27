@@ -1,0 +1,3 @@
+{
+  "query": "query GetUsers { users(first: 5) { id totalCollateralUSD totalBorrowed activePositions } }"
+}

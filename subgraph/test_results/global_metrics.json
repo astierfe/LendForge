@@ -1,0 +1,3 @@
+{
+  "query": "query GetGlobalMetrics { globalMetrics(first: 1) { id totalUsers totalPositions activePositions currentTVL currentBorrowed } }"
+}

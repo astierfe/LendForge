@@ -1,9 +1,10 @@
 // subgraph/src/collateral-manager.ts - v3.0 - Multi-collateral tracking
-import { BigDecimal, BigInt, Bytes } from "@graphprotocol/graph-ts"
+import { BigDecimal, BigInt, Bytes, Address } from "@graphprotocol/graph-ts"
 import {
   CollateralDeposited,
   CollateralWithdrawn,
-  AssetAdded
+  AssetAdded,
+  CollateralManager
 } from "../generated/CollateralManager/CollateralManager"
 import {
   User,
@@ -16,6 +17,29 @@ import {
 
 const ZERO_BI = BigInt.zero()
 const ETH_ADDRESS = Bytes.fromHexString("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
+const USDC_ADDRESS = Bytes.fromHexString("0xC47095AD18C67FBa7E46D56BDBB014901f3e327b")
+const DAI_ADDRESS = Bytes.fromHexString("0x2FA332E8337642891885453Fd40a7a7Bb010B71a")
+
+// Helper function to calculate individual asset value in USD
+function calculateAssetValueUSD(
+  collateralManagerAddress: Address,
+  userAddress: Address,
+  assetAddress: Address,
+  amount: BigInt
+): BigInt {
+  // Bind to CollateralManager contract to call getCollateralValueUSD
+  let collateralManager = CollateralManager.bind(collateralManagerAddress)
+
+  // Try to get total collateral value for the user
+  let totalValueResult = collateralManager.try_getCollateralValueUSD(userAddress)
+
+  if (totalValueResult.reverted) {
+    // If call fails, return 0
+    return ZERO_BI
+  }
+
+  return totalValueResult.value
+}
 
 function getOrCreateUser(address: string, timestamp: BigInt): User {
   let user = User.load(address)
@@ -123,8 +147,19 @@ function updateGlobalTVLByAsset(asset: Bytes, amountChange: BigInt, isDeposit: b
     } else {
       global.totalETHDeposited = global.totalETHDeposited.minus(amountChange)
     }
+  } else if (asset.equals(USDC_ADDRESS)) {
+    if (isDeposit) {
+      global.totalUSDCDeposited = global.totalUSDCDeposited.plus(amountChange)
+    } else {
+      global.totalUSDCDeposited = global.totalUSDCDeposited.minus(amountChange)
+    }
+  } else if (asset.equals(DAI_ADDRESS)) {
+    if (isDeposit) {
+      global.totalDAIDeposited = global.totalDAIDeposited.plus(amountChange)
+    } else {
+      global.totalDAIDeposited = global.totalDAIDeposited.minus(amountChange)
+    }
   }
-  // Add USDC and DAI tracking when addresses are known
 
   global.save()
 }
@@ -138,15 +173,26 @@ export function handleCollateralDeposited(event: CollateralDeposited): void {
   // Update user collateral
   userCollateral.amount = userCollateral.amount.plus(event.params.amount)
   userCollateral.updatedAt = event.block.timestamp
+
+  // Calculate valueUSD by calling CollateralManager contract
+  let totalValueUSD = calculateAssetValueUSD(
+    event.address,
+    event.params.user,
+    event.params.asset,
+    userCollateral.amount
+  )
+  userCollateral.valueUSD = totalValueUSD
+
   userCollateral.save()
 
   // Update asset total
   asset.totalDeposited = asset.totalDeposited.plus(event.params.amount)
   asset.save()
 
-  // Update user lifetime deposits
+  // Update user lifetime deposits and totalCollateralUSD
   user.lifetimeDeposits = user.lifetimeDeposits.plus(event.params.amount)
   user.updatedAt = event.block.timestamp
+  user.totalCollateralUSD = totalValueUSD
   user.save()
 
   // Create transaction
@@ -181,14 +227,25 @@ export function handleCollateralWithdrawn(event: CollateralWithdrawn): void {
   // Update user collateral
   userCollateral.amount = userCollateral.amount.minus(event.params.amount)
   userCollateral.updatedAt = event.block.timestamp
+
+  // Recalculate valueUSD after withdrawal
+  let totalValueUSD = calculateAssetValueUSD(
+    event.address,
+    event.params.user,
+    event.params.asset,
+    userCollateral.amount
+  )
+  userCollateral.valueUSD = totalValueUSD
+
   userCollateral.save()
 
   // Update asset total
   asset.totalDeposited = asset.totalDeposited.minus(event.params.amount)
   asset.save()
 
-  // Update user
+  // Update user totalCollateralUSD
   user.updatedAt = event.block.timestamp
+  user.totalCollateralUSD = totalValueUSD
   user.save()
 
   // Create transaction

@@ -1,0 +1,3 @@
+{
+  "query": "query GetComplexData { users(first: 3) { id positions { id totalCollateralUSD borrowed healthFactor } } }"
+}

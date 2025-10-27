@@ -192,17 +192,22 @@ query GetActivePositions {
   }
 }
 
-# 10. Get daily metrics (if implemented)
+# 10. Get daily metrics
 query GetDailyMetrics {
   dailyMetrics(first: 30, orderBy: date, orderDirection: desc) {
     id
     date
-    totalDepositsUSD
-    totalBorrowsUSD
-    totalRepaymentsUSD
-    newUsers
+    totalTVL
+    totalBorrowed
+    utilizationRate
     activeUsers
-    liquidations
-    averageHealthFactor
+    activePositions
+    depositsCount
+    borrowsCount
+    repaymentsCount
+    liquidationsCount
+    volumeDeposited
+    volumeBorrowed
+    volumeRepaid
   }
 }

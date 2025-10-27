@@ -44,7 +44,7 @@ contract DeployFullStackV3 is Script {
         
         // 1. Deploy PriceRegistry
         PriceRegistry registry = new PriceRegistry();
-        console.log("\n*  Step 1: PriceRegistry:", address(registry));
+        console.log("\n Step 1: PriceRegistry:", address(registry));
         
         // 2. Register assets in PriceRegistry
         registry.addAsset(
@@ -80,7 +80,7 @@ contract DeployFullStackV3 is Script {
         
         // 4. Deploy CollateralManager
         CollateralManager collateralManager = new CollateralManager(address(oracle));
-        console.log("\n*  Step 3: CollateralManager:", address(collateralManager));
+        console.log("\n Step 3: CollateralManager:", address(collateralManager));
         
         // Add assets to CollateralManager
         collateralManager.addAsset(ETH_ADDRESS, "ETH", 66, 83, 10, 18);
@@ -97,7 +97,7 @@ contract DeployFullStackV3 is Script {
             address(oracle),
             address(collateralManager)
         );
-        console.log("\n*  Step 4: LendingPool:", address(lendingPool));
+        console.log("\n Step 4: LendingPool:", address(lendingPool));
         
         // 6. Fund pool
         uint256 fundAmount = 0.1 ether;
@@ -186,7 +186,7 @@ contract DeployFullStackV3 is Script {
         require(address(pool.oracle()) == oracleAddr, "Pool oracle mismatch");
         require(address(pool.collateralManager()) == collateralManagerAddr, "Pool CM mismatch");
         
-        console.log("\n*  All verifications passed!");
+        console.log("\n All verifications passed!");
     }
 }
 

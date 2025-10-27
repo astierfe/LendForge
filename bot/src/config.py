@@ -1,8 +1,11 @@
 # bot/src/config.py - v2.0 - Multi-collateral configuration
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from project root (go up two levels from src/)
+project_root = Path(__file__).parent.parent.parent
+load_dotenv(project_root / ".env")
 
 class Config:
     # Blockchain

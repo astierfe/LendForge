@@ -1,0 +1,3 @@
+{
+  "query": "query GetAssets { collateralAssets { id symbol totalDeposited enabled } }"
+}
