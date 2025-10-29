@@ -140,6 +140,25 @@ describe("CollateralManager Integration Tests", () => {
     assert.fieldEquals("DailyMetric", "daily-20024", "depositsCount", "1")
   })
 
+  test("handleCollateralDeposited updates Position totalCollateralUSD", () => {
+    mockGetCollateralValueUSD(USER_ADDRESS, BigInt.fromI32(2000))
+
+    let event = createCollateralDepositedEvent(
+      USER_ADDRESS,
+      ETH_ADDRESS,
+      AMOUNT,
+      BigInt.fromI32(2000)
+    )
+    event.block.timestamp = TIMESTAMP
+    event.address = COLLATERAL_MANAGER_ADDRESS
+
+    handleCollateralDeposited(event)
+
+    let positionId = USER_ADDRESS.toHexString()
+    assert.fieldEquals("Position", positionId, "totalCollateralUSD", "2000")
+    assert.fieldEquals("User", positionId, "totalCollateralUSD", "2000")
+  })
+
   test("INTEGRATION: handleCollateralDeposited updates GlobalMetric and DailyMetric TVL", () => {
     let global = new GlobalMetric("global")
     global.totalUsers = 0
@@ -176,7 +195,7 @@ describe("CollateralManager Integration Tests", () => {
     assert.fieldEquals("GlobalMetric", "global", "currentTVL", "1000")
     assert.fieldEquals("GlobalMetric", "global", "totalVolumeDeposited", "1000")
 
-    assert.fieldEquals("DailyMetric", EXPECTED_DAY_ID, "ethTVL", "1000")    
+    assert.fieldEquals("DailyMetric", EXPECTED_DAY_ID, "ethTVL", "1000")
     assert.fieldEquals("DailyMetric", EXPECTED_DAY_ID, "totalTVL", "1000")
     assert.fieldEquals("DailyMetric", EXPECTED_DAY_ID, "depositsCount", "1")
     assert.fieldEquals("DailyMetric", EXPECTED_DAY_ID, "volumeDeposited", "1000")

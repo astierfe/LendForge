@@ -205,6 +205,11 @@ export function handleCollateralDeposited(event: CollateralDeposited): void {
   user.totalCollateralUSD = totalValueUSD
   user.save()
 
+  // Update position totalCollateralUSD
+  position.totalCollateralUSD = totalValueUSD
+  position.updatedAt = event.block.timestamp
+  position.save()
+
   // Create transaction
   let txType = event.params.asset.equals(ETH_ADDRESS) ? "DEPOSIT_ETH" : "DEPOSIT_ERC20"
   let txId = event.transaction.hash.toHexString() + "-" + txType + "-" + event.block.number.toString()
@@ -265,6 +270,11 @@ export function handleCollateralWithdrawn(event: CollateralWithdrawn): void {
   user.updatedAt = event.block.timestamp
   user.totalCollateralUSD = totalValueUSD
   user.save()
+
+  // Update position totalCollateralUSD
+  position.totalCollateralUSD = totalValueUSD
+  position.updatedAt = event.block.timestamp
+  position.save()
 
   // Create transaction
   let txType = event.params.asset.equals(ETH_ADDRESS) ? "WITHDRAW_ETH" : "WITHDRAW_ERC20"

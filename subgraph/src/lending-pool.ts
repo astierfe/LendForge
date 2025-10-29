@@ -127,6 +127,7 @@ export function handleBorrowed(event: Borrowed): void {
 
   // Update position
   position.borrowed = position.borrowed.plus(event.params.amount)
+  position.status = "ACTIVE"
   position.healthFactor = BigDecimal.fromString(event.params.healthFactor.toString()).div(BigDecimal.fromString("100"))
   position.updatedAt = event.block.timestamp
   position.save()

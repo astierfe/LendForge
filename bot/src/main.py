@@ -1,9 +1,6 @@
-# bot/src/main.py - v1.0 - Flask app with APScheduler
+# bot/src/main.py - v2.0 - Flask app with modular job scheduler
 from flask import Flask, jsonify
 from flask_cors import CORS
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
-import atexit
 import sys
 
 from config import Config
@@ -12,6 +9,7 @@ from clients.web3_client import Web3Client
 from services.profit_calculator import ProfitCalculator
 from services.liquidator import Liquidator
 from services.position_monitor import PositionMonitor
+from scheduler import BotScheduler
 from utils.logger import logger
 
 # Initialize Flask app
@@ -24,7 +22,7 @@ web3_client = None
 profit_calculator = None
 liquidator = None
 monitor = None
-scheduler = None
+bot_scheduler = None
 
 def initialize_services():
     global graph_client, web3_client, profit_calculator, liquidator, monitor
@@ -50,11 +48,6 @@ def initialize_services():
         logger.error(f"Failed to initialize services: {e}")
         sys.exit(1)
 
-def scheduled_monitor():
-    try:
-        monitor.monitor_cycle()
-    except Exception as e:
-        logger.error(f"Monitor cycle failed: {e}")
 
 # Flask routes
 @app.route("/health", methods=["GET"])
@@ -111,26 +104,21 @@ def risky_positions():
         logger.error(f"Failed to get risky positions: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/scheduler/status", methods=["GET"])
+def scheduler_status():
+    try:
+        status_data = bot_scheduler.get_status()
+        return jsonify(status_data)
+    except Exception as e:
+        logger.error(f"Failed to get scheduler status: {e}")
+        return jsonify({"error": str(e)}), 500
+
 def start_scheduler():
-    global scheduler
-    
-    scheduler = BackgroundScheduler()
-    
-    scheduler.add_job(
-        func=scheduled_monitor,
-        trigger=IntervalTrigger(seconds=Config.MONITOR_INTERVAL_SECONDS),
-        id="monitor_job",
-        name="Monitor risky positions",
-        replace_existing=True
-    )
-    
-    scheduler.start()
-    logger.info(
-        f"Scheduler started | interval={Config.MONITOR_INTERVAL_SECONDS}s"
-    )
-    
-    # Shutdown scheduler on exit
-    atexit.register(lambda: scheduler.shutdown())
+    global bot_scheduler
+
+    bot_scheduler = BotScheduler()
+    bot_scheduler.initialize(monitor, graph_client, web3_client, liquidator)
+    bot_scheduler.start()
 
 def main():
     logger.info("=" * 60)

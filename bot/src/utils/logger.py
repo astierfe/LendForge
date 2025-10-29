@@ -3,7 +3,11 @@ import logging
 import os
 import sys
 from logging.handlers import RotatingFileHandler
-from config import Config
+
+try:
+    from config import Config
+except ImportError:
+    from src.config import Config
 
 def setup_logger(name: str = "liquidation_bot") -> logging.Logger:
     logger = logging.getLogger(name)
