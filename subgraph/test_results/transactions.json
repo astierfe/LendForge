@@ -1,3 +1,0 @@
-{
-  "query": "query GetTransactions { transactions(first: 10) { id type txHash blockNumber timestamp } }"
-}

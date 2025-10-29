@@ -14,11 +14,15 @@ import {
   Transaction,
   GlobalMetric
 } from "../generated/schema"
+import {
+  updateDailyMetricOnDeposit,
+  updateDailyMetricOnWithdraw
+} from "./daily-metrics"
 
 const ZERO_BI = BigInt.zero()
-const ETH_ADDRESS = Bytes.fromHexString("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE")
-const USDC_ADDRESS = Bytes.fromHexString("0xC47095AD18C67FBa7E46D56BDBB014901f3e327b")
-const DAI_ADDRESS = Bytes.fromHexString("0x2FA332E8337642891885453Fd40a7a7Bb010B71a")
+const ETH_ADDRESS = Bytes.fromHexString("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+const USDC_ADDRESS = Bytes.fromHexString("0xc47095ad18c67fba7e46d56bdbb014901f3e327b")
+const DAI_ADDRESS = Bytes.fromHexString("0x2fa332e8337642891885453fd40a7a7bb010b71a")
 
 // Helper function to calculate individual asset value in USD
 function calculateAssetValueUSD(
@@ -138,30 +142,36 @@ function getOrCreateCollateralAsset(assetAddress: Bytes): CollateralAsset {
   return asset
 }
 
-function updateGlobalTVLByAsset(asset: Bytes, amountChange: BigInt, isDeposit: boolean): void {
-  let global = GlobalMetric.load("global")!
-
+function updateGlobalTVLByAsset(global: GlobalMetric, asset: Bytes, amountChange: BigInt, isDeposit: boolean): void {
   if (asset.equals(ETH_ADDRESS)) {
     if (isDeposit) {
       global.totalETHDeposited = global.totalETHDeposited.plus(amountChange)
+      global.currentTVL = global.currentTVL.plus(amountChange)
     } else {
       global.totalETHDeposited = global.totalETHDeposited.minus(amountChange)
+      global.currentTVL = global.currentTVL.minus(amountChange)
     }
   } else if (asset.equals(USDC_ADDRESS)) {
     if (isDeposit) {
       global.totalUSDCDeposited = global.totalUSDCDeposited.plus(amountChange)
+      global.currentTVL = global.currentTVL.plus(amountChange)
     } else {
       global.totalUSDCDeposited = global.totalUSDCDeposited.minus(amountChange)
+      global.currentTVL = global.currentTVL.minus(amountChange)
     }
   } else if (asset.equals(DAI_ADDRESS)) {
     if (isDeposit) {
       global.totalDAIDeposited = global.totalDAIDeposited.plus(amountChange)
+      global.currentTVL = global.currentTVL.plus(amountChange)
     } else {
       global.totalDAIDeposited = global.totalDAIDeposited.minus(amountChange)
+      global.currentTVL = global.currentTVL.minus(amountChange)
     }
   }
 
-  global.save()
+  if (global.currentTVL.gt(global.allTimeHighTVL)) {
+    global.allTimeHighTVL = global.currentTVL
+  }
 }
 
 export function handleCollateralDeposited(event: CollateralDeposited): void {
@@ -214,8 +224,16 @@ export function handleCollateralDeposited(event: CollateralDeposited): void {
   global.totalVolumeDeposited = global.totalVolumeDeposited.plus(event.params.amount)
   global.updatedAt = event.block.timestamp
 
-  updateGlobalTVLByAsset(event.params.asset, event.params.amount, true)
+  updateGlobalTVLByAsset(global, event.params.asset, event.params.amount, true)
   global.save()
+
+  // Update daily metrics
+  updateDailyMetricOnDeposit(
+    event.block.timestamp,
+    event.params.amount,
+    event.params.asset,
+    user.id
+  )
 }
 
 export function handleCollateralWithdrawn(event: CollateralWithdrawn): void {
@@ -264,9 +282,17 @@ export function handleCollateralWithdrawn(event: CollateralWithdrawn): void {
 
   // Update global metrics
   let global = GlobalMetric.load("global")!
-  updateGlobalTVLByAsset(event.params.asset, event.params.amount, false)
+  updateGlobalTVLByAsset(global, event.params.asset, event.params.amount, false)
   global.updatedAt = event.block.timestamp
   global.save()
+
+  // Update daily metrics
+  updateDailyMetricOnWithdraw(
+    event.block.timestamp,
+    event.params.amount,
+    event.params.asset,
+    user.id
+  )
 }
 
 export function handleAssetAdded(event: AssetAdded): void {

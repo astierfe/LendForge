@@ -1,3 +1,0 @@
-{
-  "query": "query GetBlockchainData { transactions(first: 5) { id txHash blockNumber timestamp } }"
-}

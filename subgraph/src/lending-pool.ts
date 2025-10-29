@@ -13,6 +13,11 @@ import {
   GlobalMetric,
   Liquidation
 } from "../generated/schema"
+import {
+  updateDailyMetricOnBorrow,
+  updateDailyMetricOnRepay,
+  updateDailyMetricOnLiquidate
+} from "./daily-metrics"
 
 const ZERO_BD = BigDecimal.fromString("0")
 const ZERO_BI = BigInt.zero()
@@ -152,6 +157,13 @@ export function handleBorrowed(event: Borrowed): void {
   }
   global.updatedAt = event.block.timestamp
   global.save()
+
+  // Update daily metrics
+  updateDailyMetricOnBorrow(
+    event.block.timestamp,
+    event.params.amount,
+    user.id
+  )
 }
 
 export function handleRepaid(event: Repaid): void {
@@ -199,6 +211,13 @@ export function handleRepaid(event: Repaid): void {
   global.currentBorrowed = global.currentBorrowed.minus(event.params.amount)
   global.updatedAt = event.block.timestamp
   global.save()
+
+  // Update daily metrics
+  updateDailyMetricOnRepay(
+    event.block.timestamp,
+    event.params.amount,
+    user.id
+  )
 }
 
 export function handleLiquidated(event: Liquidated): void {
@@ -254,4 +273,12 @@ export function handleLiquidated(event: Liquidated): void {
   global.currentBorrowed = global.currentBorrowed.minus(event.params.debtRepaid)
   global.updatedAt = event.block.timestamp
   global.save()
+
+  // Update daily metrics
+  updateDailyMetricOnLiquidate(
+    event.block.timestamp,
+    event.params.debtRepaid,
+    user.id,
+    event.params.liquidator.toHexString()
+  )
 }

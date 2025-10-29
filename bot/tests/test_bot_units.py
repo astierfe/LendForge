@@ -1,4 +1,4 @@
-# bot/tests/test_bot_units.py - Group A Unit Tests for LendForge v1.2.0
+# bot/tests/test_bot_units.py - Group A Unit Tests for LendForge v4.0.0
 # Tests coverage: T1.1.1, T1.1.4, T1.2.1-T1.2.6, T1.3.1-T1.3.5, T1.4.1-T1.4.5
 
 import pytest
@@ -273,17 +273,17 @@ class TestPositionMonitor:
         mock_position_monitor.web3_client.get_collateral_value_usd.return_value = 200000000000  # $2000
         mock_position_monitor.web3_client.get_max_borrow_value.return_value = 132000000000  # $1320 (66% LTV)
         mock_position_monitor.web3_client.get_position_onchain.return_value = (200000000000, 100000000000, 1640995200)  # $1000 borrowed
-        mock_position_monitor.web3_client.get_health_factor.return_value = 16600  # HF = 1.66
+        mock_position_monitor.web3_client.get_health_factor.return_value = 166  # HF = 1.66 (contract format: 100 = 1.0)
 
         result = mock_position_monitor.analyze_multi_collateral_position(user_address)
 
         assert result["user_address"] == user_address
-        assert result["health_factor"] == 166.0  # HF returned as raw value from contract
+        assert result["health_factor"] == 1.66  # HF converted to decimal
         assert result["collateral_usd"] == 2000.0
         assert result["borrowed_usd"] == 1000.0
         assert result["asset_count"] == 1
         assert result["is_liquidatable"] == False
-        assert result["risk_level"] == "LOW"  # HF raw value 16600 > 15000
+        assert result["risk_level"] == "LOW"  # HF raw value 166 >= 150
 
     def test_analyze_multiple_collateral_position(self, mock_position_monitor):
         """T1.3.2: Test analyze_multi_collateral_position() with multiple assets"""
@@ -297,7 +297,7 @@ class TestPositionMonitor:
         mock_position_monitor.web3_client.get_collateral_value_usd.return_value = 200000000000  # $2000 total
         mock_position_monitor.web3_client.get_max_borrow_value.return_value = 180000000000  # $1800 (mixed LTV)
         mock_position_monitor.web3_client.get_position_onchain.return_value = (200000000000, 150000000000, 1640995200)  # $1500 borrowed
-        mock_position_monitor.web3_client.get_health_factor.return_value = 13300  # HF = 1.33
+        mock_position_monitor.web3_client.get_health_factor.return_value = 133  # HF = 1.33 (contract format: 100 = 1.0)
 
         result = mock_position_monitor.analyze_multi_collateral_position(user_address)
 
@@ -320,13 +320,13 @@ class TestPositionMonitor:
         mock_position_monitor.web3_client.get_collateral_value_usd.return_value = 100000000000  # $1000 total
         mock_position_monitor.web3_client.get_max_borrow_value.return_value = 80000000000  # $800
         mock_position_monitor.web3_client.get_position_onchain.return_value = (100000000000, 120000000000, 1640995200)  # $1200 borrowed
-        mock_position_monitor.web3_client.get_health_factor.return_value = 8300  # HF = 0.83 (underwater)
+        mock_position_monitor.web3_client.get_health_factor.return_value = 83  # HF = 0.83 (underwater, contract format)
 
         result = mock_position_monitor.analyze_multi_collateral_position(user_address)
 
-        assert result["health_factor"] == 83.0  # HF returned as raw value from contract
+        assert result["health_factor"] == 0.83  # HF converted to decimal
         assert result["is_liquidatable"] == True
-        assert result["liquidation_distance_percent"] == 8200.0  # (83-1)*100 = 8200% above liquidation
+        assert result["liquidation_distance_percent"] == -17.0  # (0.83-1)*100 = -17% below liquidation
         assert result["risk_level"] == "HIGH"
 
     def test_liquidation_threshold_detection(self, mock_position_monitor):
@@ -340,13 +340,13 @@ class TestPositionMonitor:
         mock_position_monitor.web3_client.get_collateral_value_usd.return_value = 200000000000  # $2000
         mock_position_monitor.web3_client.get_max_borrow_value.return_value = 132000000000  # $1320
         mock_position_monitor.web3_client.get_position_onchain.return_value = (200000000000, 166000000000, 1640995200)  # $1660 borrowed (83% of collateral)
-        mock_position_monitor.web3_client.get_health_factor.return_value = 10000  # HF = 1.00 (exactly at threshold)
+        mock_position_monitor.web3_client.get_health_factor.return_value = 100  # HF = 1.00 (exactly at threshold, contract format)
 
         result = mock_position_monitor.analyze_multi_collateral_position(user_address)
 
-        assert result["health_factor"] == 100.0  # HF returned as raw value from contract
+        assert result["health_factor"] == 1.0  # HF converted to decimal
         assert result["is_liquidatable"] == False  # HF >= 1.0, not liquidatable yet
-        assert result["liquidation_distance_percent"] == 9900.0  # (100-1)*100 = 9900% above liquidation
+        assert result["liquidation_distance_percent"] == 0.0  # (1.0-1)*100 = 0% at liquidation threshold
         assert result["risk_level"] == "HIGH"
 
     def test_position_risk_assessment_scoring(self, mock_position_monitor):
@@ -354,7 +354,7 @@ class TestPositionMonitor:
         user_address = "0x" + "1" * 40
 
         # Test HIGH risk (HF < 1.2)
-        mock_position_monitor.web3_client.get_health_factor.return_value = 11000  # HF = 1.1
+        mock_position_monitor.web3_client.get_health_factor.return_value = 110  # HF = 1.1 (contract format)
         mock_position_monitor.web3_client.get_user_collaterals.return_value = [{"asset": Config.ETH_ADDRESS, "amount": 1, "symbol": "ETH"}]
         mock_position_monitor.web3_client.get_collateral_value_usd.return_value = 100000000000
         mock_position_monitor.web3_client.get_max_borrow_value.return_value = 80000000000
@@ -364,12 +364,12 @@ class TestPositionMonitor:
         assert result["risk_level"] == "HIGH"
 
         # Test MEDIUM risk (1.2 <= HF < 1.5)
-        mock_position_monitor.web3_client.get_health_factor.return_value = 14000  # HF = 1.4
+        mock_position_monitor.web3_client.get_health_factor.return_value = 140  # HF = 1.4 (contract format)
         result = mock_position_monitor.analyze_multi_collateral_position(user_address)
         assert result["risk_level"] == "MEDIUM"
 
         # Test LOW risk (HF >= 1.5)
-        mock_position_monitor.web3_client.get_health_factor.return_value = 20000  # HF = 2.0
+        mock_position_monitor.web3_client.get_health_factor.return_value = 200  # HF = 2.0 (contract format)
         result = mock_position_monitor.analyze_multi_collateral_position(user_address)
         assert result["risk_level"] == "LOW"
 

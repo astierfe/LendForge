@@ -98,6 +98,16 @@ type DailyMetric @entity(immutable: false) {
   ethTVL: BigInt!
   usdcTVL: BigInt!
   daiTVL: BigInt!
+  # Derived field for tracking unique users
+  userActivities: [DailyUserActivity!]! @derivedFrom(field: "dailyMetric")
+}
+
+type DailyUserActivity @entity(immutable: false) {
+  id: ID!  # Format: "daily-{dayId}-{userAddress}"
+  dailyMetric: DailyMetric!
+  user: String!
+  date: Int!
+  transactionCount: Int!
 }
 
 type GlobalMetric @entity(immutable: false) {

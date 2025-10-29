@@ -1,3 +1,0 @@
-{
-  "query": "query GetFiltered { positions(where: { status: ACTIVE }) { id status healthFactor } }"
-}

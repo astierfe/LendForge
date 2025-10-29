@@ -204,8 +204,8 @@ class PositionMonitor:
                 'liquidation_distance_percent': float(liquidation_distance),
                 'asset_count': len(collaterals),
                 'asset_breakdown': asset_breakdown,
-                'is_liquidatable': hf < 10000 and borrowed > 0,  # HF < 1.0
-                'risk_level': 'HIGH' if hf < 12000 else 'MEDIUM' if hf < 15000 else 'LOW'
+                'is_liquidatable': hf < 100 and borrowed > 0,  # HF < 1.0 (contract returns 100 = 1.0)
+                'risk_level': 'HIGH' if hf < 120 else 'MEDIUM' if hf < 150 else 'LOW'
             }
 
         except Exception as e:

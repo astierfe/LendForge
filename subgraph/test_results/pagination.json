@@ -1,3 +1,0 @@
-{
-  "query": "query GetPaginated { transactions(first: 20, orderBy: timestamp, orderDirection: desc) { id timestamp } }"
-}
