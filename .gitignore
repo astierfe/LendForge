@@ -36,7 +36,8 @@ subgraph/build/
 cache/
 broadcast/
 
-_docs/
 lib/
+
+_docs/
 
 .claude/

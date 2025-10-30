@@ -90,20 +90,31 @@ Créer interface utilisateur pour interagir avec le protocole (dépôt, emprunt,
 - [ ] Page dépôt/retrait collateral
 - [ ] Page emprunt ETH avec calcul temps réel
 - [ ] Affichage health factor avec alertes
-- [ ] Dashboard analytics (TVL, prix, metrics)
+- [ ] Dashboard analytics avec données mixtes :
+  - Graphiques The Graph (vraies données protocole)
+  - Prix CoinGecko API (display only, graphiques réalistes)
+  - Label clair distinction on-chain vs off-chain
 - [ ] Tests e2e avec Playwright (optionnel)
 
-### Phase 3: Tests Avancés (2-3 jours)
+### Phase 3: Oracles Réels Sepolia (Optionnel - 2-3h)
+- [ ] Rechercher Chainlink feeds non-stale (USDC/DAI)
+- [ ] Vérifier pools Uniswap V3 Sepolia actifs
+- [ ] Déployer providers si disponibles
+- [ ] Mise à jour PriceRegistry via updatePrimaryProvider()
+- [ ] **Note :** Faible priorité, graphiques CoinGecko suffisants pour portfolio
+
+### Phase 4: Tests Avancés (Optionnel - 2-3 jours)
 - [ ] Scénario oracle deviation > 10%
 - [ ] Test emergency mode activation
 - [ ] Multiple users simultanés
 - [ ] Stress test liquidations multiples
 
-### Phase 4: Documentation Finale
+### Phase 5: Documentation Finale
 - [ ] README principal avec quick start
 - [ ] Architecture diagram (contracts, bot, subgraph, frontend)
 - [ ] Deployment guide complet
 - [ ] Video demo (optionnel)
+- [ ] Portfolio presentation notes
 
 ---
 
