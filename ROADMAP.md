@@ -1,7 +1,7 @@
 # LendForge - Roadmap Développement
 
-**Version actuelle:** v4.8.0
-**Dernière mise à jour:** 29 octobre 2025
+**Version actuelle:** v4.3.0
+**Dernière mise à jour:** 30 janvier 2025
 
 ---
 
@@ -17,70 +17,81 @@
 - Tests: 69 tests unitaires + intégration PASS
 - Déployé sur Sepolia Testnet
 
-**The Graph Subgraph - v4.8.0**
+**The Graph Subgraph - v4.10.0**
 - GlobalMetric: TVL total + TVL par asset (ETH/USDC/DAI)
 - DailyMetric: Métriques quotidiennes complètes
-- DailyUserActivity: Tracking utilisateurs uniques (pas de double-comptage)
-- PriceDeviation: Historique des déviations oracle
+- Position lifecycle: Status ACTIVE/REPAID/LIQUIDATED
 - Tests: 18 tests Matchstick PASS
+- Bug fixes: position status reactivation, totalCollateralUSD tracking
 - Déployé et indexé sur The Graph Studio
 
-**Bot Python - Tests Unitaires**
-- Configuration multi-collateral validée
-- Position monitoring: détection positions à risque
-- Emergency mode support
-- Oracle deviation handling
-- Tests pytest: PASS
+**Bot Python - Opérationnel** ✅
+- APScheduler: 3 jobs cron (health_monitor 30s, liquidation_check 60s, price_sync 5min)
+- Multi-asset liquidation: ETH, USDC, DAI support
+- Profitability calculation avec gas estimation
+- Flask API exposée sur port 5000
+- Tests end-to-end validés: détection < 60s, liquidation automatique réussie
+
+**Documentation - v1.3.0** ✅
+- Spec technique complète avec formules correctes
+- Liquidation threshold: 83% ETH, 95% stablecoins (vérifié on-chain)
+- Leverage mechanism documenté avec exemples
+- Alignment report: code vs spec validation
 
 ---
 
-## 🎯 Prochaine Priorité: Bot Cron + Test End-to-End
+## 🎯 Prochaine Priorité: Frontend Dashboard
 
 ### Objectif
-Implémenter le système de cron pour le bot Python et valider le cycle complet de liquidation automatisée.
+Créer interface utilisateur pour interagir avec le protocole (dépôt, emprunt, monitoring).
 
 ### Fonctionnalités à Implémenter
 
-**1. Système de Cron (jobs/)**
-- `health_monitor.py`: Surveillance positions toutes les 30s
-- `liquidation_check.py`: Vérification liquidations toutes les 60s
-- `price_sync.py`: Synchronisation prix CoinGecko toutes les 5min
+**1. Connexion Wallet**
+- RainbowKit + wagmi v2
+- Support Sepolia testnet
+- Affichage balance utilisateur
 
-**2. Scheduler (APScheduler)**
-- Configuration des intervalles d'exécution
-- Gestion des erreurs et retry logic
-- Logging structuré des exécutions
+**2. Dashboard Principal**
+- Vue positions utilisateur (collateral, dette, HF)
+- Alertes liquidation si HF < 1.5
+- TVL global du protocole
 
-**3. Test End-to-End**
-- Bot interroge The Graph pour positions à risque
-- Détecte health factor < 1.0
-- Exécute liquidation on-chain (cast send)
-- Vérifie indexation événement Liquidated dans subgraph
-- Valide mise à jour des métriques (GlobalMetric, DailyMetric)
+**3. Pages Dépôt/Emprunt**
+- Formulaires dépôt multi-collateral
+- Calcul temps réel max empruntable (LTV)
+- Validation transactions
+
+**4. Analytics**
+- Graphiques TVL historique (subgraph)
+- Liquidations récentes
+- Comparaison prix Chainlink vs CoinGecko
 
 ### Critères de Succès
-- [ ] Bot tourne en continu sans crash
-- [ ] Détection position risquée < 1 minute
-- [ ] Liquidation exécutée automatiquement
-- [ ] Événement Liquidated indexé dans subgraph
-- [ ] Métriques mises à jour correctement
+- [ ] Connexion wallet fonctionnelle
+- [ ] Dépôt/retrait collateral opérationnel
+- [ ] Emprunt ETH avec calcul LTV temps réel
+- [ ] Affichage health factor dynamique
+- [ ] Graphiques analytics avec données réelles
 
 ---
 
 ## Reste à Faire (Vue d'ensemble)
 
-### Phase 1: Bot Automatisé (2-3 jours)
-- [ ] Implémenter les 3 jobs cron
-- [ ] Configurer APScheduler
-- [ ] Tester cycle complet end-to-end
-- [ ] Documenter résultats dans `bot/INTEGRATION_TEST_RESULTS.md`
+### Phase 1: Bot Automatisé ✅ (Complété v4.3.0)
+- ✅ Implémenter les 3 jobs cron
+- ✅ Configurer APScheduler
+- ✅ Tester cycle complet end-to-end
+- ✅ Validation: liquidation automatique réussie
 
-### Phase 2: Frontend Dashboard (1 semaine)
-- [ ] Interface connexion wallet (RainbowKit)
+### Phase 2: Frontend Dashboard (1-2 semaines) 🚧
+- [ ] Setup Next.js 14 + RainbowKit + wagmi
+- [ ] Interface connexion wallet
 - [ ] Page dépôt/retrait collateral
 - [ ] Page emprunt ETH avec calcul temps réel
 - [ ] Affichage health factor avec alertes
 - [ ] Dashboard analytics (TVL, prix, metrics)
+- [ ] Tests e2e avec Playwright (optionnel)
 
 ### Phase 3: Tests Avancés (2-3 jours)
 - [ ] Scénario oracle deviation > 10%
