@@ -1,13 +1,14 @@
 'use client';
 
 import { Header } from '@/components/layout/Header';
+import { PageContainer } from '@/components/layout/PageContainer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function BorrowPage() {
   return (
     <>
       <Header title="Borrow ETH" />
-      <div className="flex-1 p-6 space-y-6">
+      <PageContainer>
         <Card>
           <CardHeader>
             <CardTitle>Borrow ETH</CardTitle>
@@ -21,7 +22,7 @@ export default function BorrowPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </>
   );
 }

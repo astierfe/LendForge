@@ -1,13 +1,14 @@
 'use client';
 
 import { Header } from '@/components/layout/Header';
+import { PageContainer } from '@/components/layout/PageContainer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function DepositPage() {
   return (
     <>
       <Header title="Deposit Collateral" />
-      <div className="flex-1 p-6 space-y-6">
+      <PageContainer>
         <Card>
           <CardHeader>
             <CardTitle>Deposit Collateral</CardTitle>
@@ -21,7 +22,7 @@ export default function DepositPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </>
   );
 }

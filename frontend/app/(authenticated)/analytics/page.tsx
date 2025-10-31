@@ -1,13 +1,14 @@
 'use client';
 
 import { Header } from '@/components/layout/Header';
+import { PageContainer } from '@/components/layout/PageContainer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function AnalyticsPage() {
   return (
     <>
       <Header title="Analytics" />
-      <div className="flex-1 p-6 space-y-6">
+      <PageContainer>
         <Card>
           <CardHeader>
             <CardTitle>Protocol Analytics</CardTitle>
@@ -21,7 +22,7 @@ export default function AnalyticsPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </>
   );
 }

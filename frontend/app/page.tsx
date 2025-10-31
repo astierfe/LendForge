@@ -1,39 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
+import { useSuspenseQuery } from '@apollo/experimental-nextjs-app-support/ssr';
 import { ConnectButton } from '@/components/wallet/ConnectButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { GET_GLOBAL_METRICS } from '@/lib/graphql/queries/metrics';
 import { DollarSign, Users, TrendingUp } from 'lucide-react';
 
-// Temporary mock data until Apollo is fully configured
-const useMockGlobalMetrics = () => {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+interface GlobalMetric {
+  id: string;
+  currentTVL: string; // BigInt from subgraph
+  currentBorrowed: string; // BigInt from subgraph
+  activePositions: number;
+  totalETHDeposited: string; // BigInt
+  totalUSDCDeposited: string; // BigInt
+  totalDAIDeposited: string; // BigInt
+  updatedAt: string; // BigInt timestamp
+}
 
-  useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
-      setData({
-        globalMetrics: [{
-          totalCollateralUSD: 0,
-          totalActivePositions: 0,
-          totalBorrowed: 0,
-        }]
-      });
-      setLoading(false);
-    }, 1000);
-  }, []);
-
-  return { data, loading };
-};
+interface GlobalMetricsData {
+  globalMetrics: GlobalMetric[];
+}
 
 export default function LandingPage() {
   const router = useRouter();
   const { isConnected } = useAccount();
-  const { data, loading } = useMockGlobalMetrics();
+
+  // Use Apollo Client with Next.js 15 App Router
+  const { data } = useSuspenseQuery<GlobalMetricsData>(GET_GLOBAL_METRICS);
+  const loading = false; // useSuspenseQuery handles loading automatically
 
   // Redirect to dashboard if wallet is connected
   useEffect(() => {
@@ -133,7 +131,7 @@ export default function LandingPage() {
                   <Skeleton className="h-8 w-32" />
                 ) : (
                   <p className="text-3xl font-bold">
-                    ${globalMetrics?.totalCollateralUSD?.toLocaleString() || '0'}
+                    ${globalMetrics?.currentTVL ? (parseFloat(globalMetrics.currentTVL) / 1e18).toFixed(2) : '0'}
                   </p>
                 )}
               </CardContent>
@@ -148,7 +146,7 @@ export default function LandingPage() {
                   <Skeleton className="h-8 w-20" />
                 ) : (
                   <p className="text-3xl font-bold">
-                    {globalMetrics?.totalActivePositions || 0}
+                    {globalMetrics?.activePositions || 0}
                   </p>
                 )}
               </CardContent>
@@ -163,7 +161,7 @@ export default function LandingPage() {
                   <Skeleton className="h-8 w-32" />
                 ) : (
                   <p className="text-3xl font-bold">
-                    {globalMetrics?.totalBorrowed?.toFixed(2) || '0'} ETH
+                    {globalMetrics?.currentBorrowed ? (parseFloat(globalMetrics.currentBorrowed) / 1e18).toFixed(2) : '0'} ETH
                   </p>
                 )}
               </CardContent>

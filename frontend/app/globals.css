@@ -1,3 +1,16 @@
+/**
+ * LendForge Frontend - Global Styles
+ *
+ * IMPORTANT: Keep this file minimal!
+ * - Only Tailwind directives
+ * - Theme variables (shadcn/ui)
+ * - Basic resets
+ *
+ * For component-specific styles, use:
+ * - Tailwind utility classes (inline)
+ * - Layout components (PageContainer, Section, ContentGrid)
+ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
