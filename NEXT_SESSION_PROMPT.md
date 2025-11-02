@@ -1,52 +1,34 @@
-# Prompt de Démarrage - Session Frontend Dashboard
+# Next Session - Frontend Phase 3 Dashboard
 
-Bonjour Claude,
+Hi Claude,
 
-Je travaille sur **LendForge v4.3.0**, une plateforme DeFi de prêt multi-collateral sur Sepolia.
+Working on **LendForge v5.2.0** - DeFi lending protocol with multi-collateral support on Sepolia.
 
-## Contexte Rapide
-- ✅ Smart contracts déployés et testés (69 tests PASS)
-- ✅ Subgraph v4.10.0 déployé avec tracking complet (18 tests PASS)
-- ✅ Bot Python opérationnel avec liquidations automatiques
-- ✅ Test end-to-end validé (détection < 60s, liquidation automatique réussie)
-- ❌ **Frontend dashboard non implémenté** (pas d'interface utilisateur)
+## Current Status
+- Smart contracts deployed and tested (LendingPool v4.1 fixed borrow validation bug)
+- Subgraph v4.1.1 deployed with correct activePositions tracking
+- Frontend Phase 1 & 2 complete (Next.js 15 + Apollo + RainbowKit)
+- Hooks created: `useUserPosition.ts`, `useHealthFactor.ts` in `frontend/hooks/`
+- GraphQL query ready: `GET_USER_POSITION_DETAILED` in `frontend/lib/graphql/queries/metrics.ts`
+- Test position exists on-chain with HF = 15.12, activePositions = 1
 
-## Objectif de cette Session
-Implémenter le **dashboard frontend** avec Next.js 14 + RainbowKit pour interagir avec le protocole.
+## Goal
+Implement Phase 3 Dashboard with real data from subgraph.
 
-## Ce que je veux
-1. **Page Connexion Wallet**
-   - Integration RainbowKit (wagmi v2)
-   - Support Sepolia testnet
-   - Affichage adresse + balance
+## What I Need
 
-2. **Page Dashboard Principal**
-   - Vue d'ensemble TVL global
-   - Positions utilisateur (collateral, dette, health factor)
-   - Alertes si HF < 1.5 (risque de liquidation)
+Create 4 dashboard cards in `app/(authenticated)/dashboard/page.tsx`:
 
-3. **Page Dépôt/Emprunt**
-   - Formulaire dépôt collateral (ETH, USDC, DAI)
-   - Calcul temps réel du max empruntable (LTV)
-   - Bouton emprunt ETH avec validation
+1. **TVLOverviewCard** - Global TVL with ETH/USDC/DAI breakdown
+2. **UserPositionCard** - User collateral, debt, available to borrow
+3. **HealthFactorDisplay** - Visual gauge with risk levels (Safe/Warning/Danger)
+4. **QuickActionsCard** - CTA buttons (Deposit/Borrow/Repay)
 
-4. **Page Analytics**
-   - Graphiques TVL historique (données subgraph)
-   - Liquidations récentes
-   - Prix assets (Chainlink vs CoinGecko)
+## Key Files
+- `frontend/FRONTEND_STATUS.md` - Phase 3 specs (line 224+)
+- `frontend/hooks/useUserPosition.ts` - Already exists, test if working
+- `frontend/hooks/useHealthFactor.ts` - Already exists, test if working
+- `frontend/lib/contracts/config.ts` - LTV and thresholds constants
 
-## Documents à Consulter
-- `ROADMAP.md` : Vue d'ensemble et fichiers clés
-- `_docs/spec_lending_pool_v1_3_0.md` : Formules HF, LTV, liquidation
-- `.env` : Adresses contracts déployés
-- `subgraph/schema.graphql` : Entités GraphQL disponibles
-
-## Fichiers Clés Existants
-- `contracts/interfaces/*.sol` : ABIs à exporter pour wagmi
-- `subgraph/` : Source de données pour analytics
-- Bot opérationnel sur `http://localhost:5000` (Flask API)
-
-## Question de Démarrage
-Peux-tu d'abord lire `ROADMAP.md` et `spec_lending_pool_v1_3_0.md`, puis me proposer une stack technique pour le frontend et un plan d'implémentation par ordre de priorité ?
-
-Merci !
+## Start Simple
+Read `frontend/FRONTEND_STATUS.md` Phase 3 section, then propose implementation order. Keep context light initially.

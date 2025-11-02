@@ -1,21 +1,22 @@
-# LendForge Frontend - Status Phase 1 & 2
+# LendForge Frontend - Status
 
-**Date:** 30 octobre 2025
-**Version:** v0.1.0
-**Status:** Phase 1 & 2 Complétées ✅
+**Date:** 30 janvier 2025
+**Version:** v5.1.0
+**Status:** Phase 1 & 2 Complétées ✅ | Phase 3 En cours 🚧
 
 ---
 
 ## Résumé
 
-Les **Phases 1 (Infrastructure)** et **Phase 2 (Connexion & Layout)** du frontend LendForge sont complétées avec succès. Le projet Next.js 14 est configuré avec RainbowKit, wagmi v2, et la structure de navigation.
+Les **Phases 1 (Infrastructure)** et **Phase 2 (Connexion & Layout)** du frontend LendForge sont complétées avec succès. Le projet est configuré avec Next.js 15, React 19, Apollo GraphQL, RainbowKit, et wagmi v2.
 
 ---
 
 ## ✅ Phase 1 : Infrastructure (Complétée)
 
 ### 1.1 - Projet Next.js
-- ✅ Next.js 14 avec App Router
+- ✅ Next.js 15 avec App Router
+- ✅ React 19
 - ✅ TypeScript 5.x configuré
 - ✅ TailwindCSS installé et configuré
 - ✅ ESLint setup
@@ -27,10 +28,10 @@ Les **Phases 1 (Infrastructure)** et **Phase 2 (Connexion & Layout)** du fronten
 - ✅ Providers setup (`app/providers.tsx`)
 
 ### 1.3 - GraphQL (The Graph)
-- ✅ Apollo Client installé
-- ✅ Client configuré (`lib/graphql/client.ts`)
-- ✅ Queries GraphQL créées (`lib/graphql/queries/metrics.ts`)
-- ⚠️ Apollo Provider temporairement désactivé (erreurs d'import à résoudre)
+- ✅ Apollo Client avec `@apollo/experimental-nextjs-app-support`
+- ✅ Client configuré (`lib/graphql/apollo-client.ts`)
+- ✅ Queries GraphQL créées et fonctionnelles (`lib/graphql/queries/metrics.ts`)
+- ✅ Query `GET_GLOBAL_METRICS` affiche données réelles sur landing page
 
 ### 1.4 - ABIs & Addresses
 - ✅ ABIs copiés depuis `../out/` :
@@ -56,9 +57,9 @@ Les **Phases 1 (Infrastructure)** et **Phase 2 (Connexion & Layout)** du fronten
 - ✅ Hero section avec titre et description
 - ✅ ConnectButton (RainbowKit wrapper)
 - ✅ Features Grid (3 cards : Multi-Asset, Secure Oracles, Transparent Metrics)
-- ✅ Stats Banner (TVL, Active Positions, Total Borrowed)
+- ✅ Stats Banner avec **données réelles** depuis subgraph (TVL, Active Positions, Total Borrowed)
 - ✅ Redirect automatique vers `/dashboard` si wallet connectée
-- ⚠️ Données mockées temporairement (Apollo à réactiver)
+- ✅ Conversion BigInt (Wei → ETH) pour affichage
 
 ### 2.2 - Layout Authenticated
 - ✅ Route group `(authenticated)/` créée
@@ -128,24 +129,29 @@ frontend/
 
 ---
 
-## ⚠️ Problèmes Connus
+## ✅ Problèmes Résolus
 
-### 1. Apollo Client Import Error
-**Erreur:** `Module '@apollo/client' has no exported member 'useQuery'`
+### 1. Apollo Client avec Next.js 15
+**Solution:** Installation de `@apollo/experimental-nextjs-app-support`
+- Import `ApolloClient` et `InMemoryCache` depuis `@apollo/experimental-nextjs-app-support`
+- Import `useSuspenseQuery` depuis `@apollo/experimental-nextjs-app-support/ssr`
+- Fonctionnement parfait avec Next.js 15 App Router
 
-**Cause:** Possible incompatibilité de version ou cache TypeScript
+### 2. GraphQL Schema Mismatch
+**Solution:** Correction des queries pour correspondre au schéma subgraph réel
+- `totalCollateralUSD` → `currentTVL` (BigInt)
+- `totalBorrowed` → `currentBorrowed` (BigInt)
+- `totalActivePositions` → `activePositions`
+- Conversion BigInt: `parseFloat(value) / 1e18`
 
-**Solution temporaire:** Apollo Provider désactivé dans `providers.tsx`, données mockées dans `page.tsx`
+### 3. wagmi v2 API Changes
+**Solution:** Utilisé `useChainId()` + `useAccount()` à la place de `useNetwork()`
 
-**À faire:**
-- Vérifier import Apollo Client v4
-- Tester avec `@apollo/experimental-nextjs-app-support` si nécessaire
-- Ou utiliser fetch direct pour The Graph queries
-
-### 2. wagmi v2 API Changes
-**Changement:** `useNetwork()` n'existe plus dans wagmi v2
-
-**Solution appliquée:** Utilisé `useChainId()` + `useAccount()` dans `NetworkBadge.tsx`
+### 4. Styles Organization
+**Solution:** Composants layout réutilisables créés
+- `PageContainer` : `flex-1 p-6 space-y-6`
+- `Section` : Vertical spacing (sm/md/lg)
+- `ContentGrid` : Responsive grids
 
 ---
 
@@ -215,4 +221,69 @@ NEXT_PUBLIC_DAI_ADDRESS=0x2FA332E8337642891885453Fd40a7a7Bb010B71a
 
 ---
 
-**Status:** ✅ Prêt pour Phase 3 - Dashboard
+---
+
+## 🚧 Phase 3 : Dashboard (En cours)
+
+### Objectif
+Implémenter le dashboard principal avec données réelles et composants interactifs.
+
+### Composants à Créer
+
+**1. TVLOverviewCard**
+- TVL global avec breakdown par asset (ETH/USDC/DAI)
+- Utilise query `GET_GLOBAL_METRICS` (déjà existante)
+- Affichage : Total + 3 sous-totaux
+
+**2. UserPositionCard**
+- Position utilisateur : collateral, dette, disponible à emprunter
+- Query à créer : `GET_USER_POSITION` (dans `lib/graphql/queries/metrics.ts`)
+- Empty state si pas de position
+
+**3. HealthFactorDisplay**
+- Gauge visuel avec niveau (Safe/Warning/Danger)
+- Formule : `(collateralUSD * liquidationThreshold) / borrowed`
+- Alertes si HF < 1.5
+- Hook : `useHealthFactor`
+
+**4. QuickActionsCard**
+- 3 boutons : Deposit, Borrow, Repay
+- Navigation vers pages correspondantes
+
+### Hooks Custom à Créer
+
+**`hooks/useUserPosition.ts`**
+```typescript
+// Fetch position utilisateur depuis subgraph
+// Input: wallet address
+// Output: { collateral, borrowed, healthFactor, loading, error }
+```
+
+**`hooks/useHealthFactor.ts`**
+```typescript
+// Calcul health factor temps réel
+// Formule: (collateralUSD * liquidationThreshold) / borrowed
+// Utilise lib/contracts/config.ts pour thresholds
+```
+
+### Formules (déjà dans `lib/contracts/config.ts`)
+
+- **LTV Ratios** : ETH 66%, USDC/DAI 75%
+- **Liquidation Thresholds** : ETH 83%, USDC/DAI 95%
+- **Health Factor** : `(totalCollateralUSD * liquidationThreshold) / totalBorrowed`
+- **Max Borrowable** : `(totalCollateralUSD * LTV) - currentBorrowed`
+
+### Ordre d'Implémentation
+
+1. Query `GET_USER_POSITION` dans `lib/graphql/queries/metrics.ts`
+2. Hook `useUserPosition.ts`
+3. Hook `useHealthFactor.ts`
+4. Composant `HealthFactorDisplay.tsx` (le plus complexe)
+5. Composant `TVLOverviewCard.tsx` (réutilise GET_GLOBAL_METRICS)
+6. Composant `UserPositionCard.tsx`
+7. Composant `QuickActionsCard.tsx`
+8. Assembler dans `/dashboard/page.tsx`
+
+---
+
+**Status:** ✅ Phases 1 & 2 Complètes | 🚧 Phase 3 Prête à démarrer

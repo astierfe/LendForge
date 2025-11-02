@@ -80,19 +80,37 @@ contract LendingPool is ILendingPool {
         
         // Check if new borrow exceeds max borrow capacity
         uint256 maxBorrow = collateralManager.getMaxBorrowValue(msg.sender);
-        uint256 newTotalDebt = position.borrowedAmount + amount;
-        
-        if (newTotalDebt > maxBorrow) {
+
+        // Convert ETH debt to USD for comparison with maxBorrow (which is in USD)
+        int256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        require(ethPrice > 0, "Invalid ETH price");
+
+        uint256 currentDebtUSD = HealthCalculator.convertETHtoUSD(
+            position.borrowedAmount,
+            uint256(ethPrice)
+        );
+        uint256 newBorrowUSD = HealthCalculator.convertETHtoUSD(
+            amount,
+            uint256(ethPrice)
+        );
+        uint256 newTotalDebtUSD = currentDebtUSD + newBorrowUSD;
+
+        if (newTotalDebtUSD > maxBorrow) {
             revert ExceedsLTV();
         }
-        
+
         position.borrowedAmount += amount;
         position.lastInterestUpdate = block.timestamp;
         totalBorrowed += amount;
-        
+
+        // Calculate health factor with debt in USD
+        uint256 newDebtUSD = HealthCalculator.convertETHtoUSD(
+            position.borrowedAmount,
+            uint256(ethPrice)
+        );
         uint256 healthFactor = HealthCalculator.calculateHealthFactor(
             collateralValueUSD,
-            position.borrowedAmount
+            newDebtUSD
         );
         
         emit Borrowed(msg.sender, amount, healthFactor);
@@ -150,11 +168,20 @@ contract LendingPool is ILendingPool {
         
         // Get total collateral value
         uint256 collateralValueUSD = collateralManager.getCollateralValueUSD(user);
-        
+
+        // Convert debt to USD for health factor calculation
+        int256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        require(ethPrice > 0, "Invalid ETH price");
+
+        uint256 debtUSD = HealthCalculator.convertETHtoUSD(
+            position.borrowedAmount,
+            uint256(ethPrice)
+        );
+
         // Check if liquidatable
         if (!HealthCalculator.isLiquidatable(
             collateralValueUSD,
-            position.borrowedAmount
+            debtUSD
         )) {
             revert HealthyPosition();
         }
@@ -200,21 +227,30 @@ contract LendingPool is ILendingPool {
         });
     }
     
-    function getHealthFactor(address user) 
-        external 
-        returns (uint256) 
+    function getHealthFactor(address user)
+        external
+        returns (uint256)
     {
         DataTypes.Position storage pos = positions[user];
-        
+
         if (pos.borrowedAmount == 0) {
             return type(uint256).max;
         }
-        
+
         uint256 collateralValueUSD = collateralManager.getCollateralValueUSD(user);
-        
+
+        // Convert debt to USD for health factor calculation
+        int256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        require(ethPrice > 0, "Invalid ETH price");
+
+        uint256 debtUSD = HealthCalculator.convertETHtoUSD(
+            pos.borrowedAmount,
+            uint256(ethPrice)
+        );
+
         return HealthCalculator.calculateHealthFactor(
             collateralValueUSD,
-            pos.borrowedAmount
+            debtUSD
         );
     }
     

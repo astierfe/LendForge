@@ -192,13 +192,15 @@ contract LendingPoolTest is Test {
     
     function testCannotExceedMaxBorrow() public {
         vm.startPrank(user1);
-        
+
         collateralManager.depositETH{value: 1 ether}();
-        
-        // Max borrow = $1320
+
+        // Collateral: 1 ETH @ $2000 = $2000
+        // Max borrow: $2000 × 66% = $1320
+        // To exceed: borrow > 0.66 ETH (0.75 ETH @ $2000 = $1500 > $1320)
         vm.expectRevert(ILendingPool.ExceedsLTV.selector);
-        pool.borrow(1500e8);
-        
+        pool.borrow(0.75 ether);
+
         vm.stopPrank();
     }
     
@@ -306,20 +308,26 @@ contract LendingPoolTest is Test {
     
     function testHealthFactorUnhealthy() public {
         vm.startPrank(user1);
-        
-        collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1200e8);
-        
+
+        // Use USDC collateral (stable) so price change affects only debt
+        deal(address(usdc), user1, 2000e6);
+        usdc.approve(address(collateralManager), 2000e6);
+        collateralManager.depositERC20(address(usdc), 2000e6);
+
+        // Borrow ETH: 0.90 ETH @ $2000 = $1900 (close to max $1900 = $2000 * 95%)
+        pool.borrow(0.90 ether);
+
         vm.stopPrank();
-        
-        // Drop ETH price to $1000
-        ethFeed.setPrice(1000e8);
-        ethFallback.setPrice(1000e8);
-        
+
+        // Increase ETH price to $2200
+        ethFeed.setPrice(2200e8);
+        ethFallback.setPrice(2200e8);
+
         uint256 hf = pool.getHealthFactor(user1);
-        
-        // Collateral: $1000, LT: 83%, Debt: $1200
-        // HF = ($1000 * 83%) / $1200 = 69
+
+        // Collateral: $2000 USDC (stable), LT: 95%
+        // Debt: 0.90 ETH @ $2200 = $2090
+        // HF = ($2000 * 95%) / $2090 = 1900 / 2090 = 90 < 100 ✓
         assertLt(hf, 100);
     }
     
@@ -339,23 +347,28 @@ contract LendingPoolTest is Test {
     
     function testLiquidateUnhealthyPosition() public {
         vm.startPrank(user1);
-        
-        collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1200e8);
-        
+
+        // Use USDC collateral
+        deal(address(usdc), user1, 2000e6);
+        usdc.approve(address(collateralManager), 2000e6);
+        collateralManager.depositERC20(address(usdc), 2000e6);
+
+        // Borrow 0.90 ETH @ $2000 = $1900
+        pool.borrow(0.90 ether);
+
         vm.stopPrank();
-        
-        // Drop ETH price
-        ethFeed.setPrice(1000e8);
-        ethFallback.setPrice(1000e8);
-        
+
+        // Increase ETH price to make position unhealthy
+        ethFeed.setPrice(2200e8);
+        ethFallback.setPrice(2200e8);
+
         uint256 hf = pool.getHealthFactor(user1);
         assertLt(hf, 100);
-        
-        // Liquidate
+
+        // Liquidate with correct ETH amount (0.90 ETH debt)
         vm.prank(liquidator);
-        pool.liquidate{value: 1200e8}(user1);
-        
+        pool.liquidate{value: 0.90 ether}(user1);
+
         uint256 borrowedAfter = pool.getBorrowedAmount(user1);
         assertEq(borrowedAfter, 0);
     }
@@ -375,18 +388,25 @@ contract LendingPoolTest is Test {
     
     function testLiquidationRequiresSufficientPayment() public {
         vm.startPrank(user1);
-        
-        collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1200e8);
-        
+
+        // Use USDC collateral
+        deal(address(usdc), user1, 2000e6);
+        usdc.approve(address(collateralManager), 2000e6);
+        collateralManager.depositERC20(address(usdc), 2000e6);
+
+        // Borrow 0.90 ETH
+        pool.borrow(0.90 ether);
+
         vm.stopPrank();
-        
-        ethFeed.setPrice(1000e8);
-        ethFallback.setPrice(1000e8);
-        
+
+        // Make unhealthy
+        ethFeed.setPrice(2200e8);
+        ethFallback.setPrice(2200e8);
+
+        // Try to liquidate with insufficient payment (only 0.5 ETH instead of 0.95)
         vm.prank(liquidator);
         vm.expectRevert("Insufficient payment");
-        pool.liquidate{value: 1000e8}(user1);
+        pool.liquidate{value: 0.5 ether}(user1);
     }
     
     // ============ Withdraw Tests ============

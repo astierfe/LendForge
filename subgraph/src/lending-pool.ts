@@ -125,6 +125,9 @@ export function handleBorrowed(event: Borrowed): void {
   let user = getOrCreateUser(event.params.user.toHexString(), event.block.timestamp)
   let position = getOrCreatePosition(user.id, event.block.timestamp)
 
+  // Check if this is the first borrow (new active position)
+  let isNewActivePosition = position.borrowed.equals(ZERO_BI)
+
   // Update position
   position.borrowed = position.borrowed.plus(event.params.amount)
   position.status = "ACTIVE"
@@ -135,6 +138,12 @@ export function handleBorrowed(event: Borrowed): void {
   // Update user
   user.totalBorrowed = user.totalBorrowed.plus(event.params.amount)
   user.lifetimeBorrows = user.lifetimeBorrows.plus(event.params.amount)
+
+  // FIX: Increment activePositions for new positions
+  if (isNewActivePosition) {
+    user.activePositions = user.activePositions + 1
+  }
+
   user.updatedAt = event.block.timestamp
   user.save()
 
@@ -185,6 +194,11 @@ export function handleRepaid(event: Repaid): void {
       global.activePositions = global.activePositions - 1
     }
     global.save()
+
+    // FIX: Decrement user's activePositions when position is closed
+    if (user.activePositions > 0) {
+      user.activePositions = user.activePositions - 1
+    }
   }
 
   position.save()
@@ -237,6 +251,12 @@ export function handleLiquidated(event: Liquidated): void {
   user.totalBorrowed = ZERO_BI
   user.totalCollateralUSD = ZERO_BI
   user.liquidationCount = user.liquidationCount + 1
+
+  // FIX: Decrement user's activePositions when liquidated
+  if (user.activePositions > 0) {
+    user.activePositions = user.activePositions - 1
+  }
+
   user.updatedAt = event.block.timestamp
   user.save()
 

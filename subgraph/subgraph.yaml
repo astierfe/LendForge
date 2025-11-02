@@ -9,9 +9,9 @@ dataSources:
     name: LendingPool
     network: sepolia
     source:
-      address: "0x06AF08708B45968492078A1900124DaA832082cD"  # NEW ADDRESS
+      address: "0x504BD0CcAF75881CfCD8f432983A56A5C4e5Aa84"  # NEW ADDRESS
       abi: LendingPool
-      startBlock: 9459666  # AssetAdded events block (3 events emitted)
+      startBlock: 9544827  # AssetAdded events block (3 events emitted)
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.8

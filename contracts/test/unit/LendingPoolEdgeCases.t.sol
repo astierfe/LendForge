@@ -295,46 +295,56 @@ contract LendingPoolEdgeCasesTest is Test {
     function testLiquidateEmitsLiquidatedEvent() public {
         vm.startPrank(user1);
 
-        collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1200e8);
+        // Use USDC collateral
+        deal(address(usdc), user1, 2000e6);
+        usdc.approve(address(collateralManager), 2000e6);
+        collateralManager.depositERC20(address(usdc), 2000e6);
+
+        // Borrow 0.90 ETH @ $2000 = $1900
+        pool.borrow(0.90 ether);
 
         vm.stopPrank();
 
-        // Drop ETH price to make position unhealthy
-        ethFeed.setPrice(1000e8);
-        ethFallback.setPrice(1000e8);
+        // Increase ETH price to make unhealthy
+        ethFeed.setPrice(2200e8);
+        ethFallback.setPrice(2200e8);
 
         // Expect Liquidated event
         vm.expectEmit(true, true, false, false);
         emit Liquidated(liquidator, user1, 0, 0); // amounts will be calculated
 
         vm.prank(liquidator);
-        pool.liquidate{value: 1200e8}(user1);
+        pool.liquidate{value: 0.90 ether}(user1);
     }
 
     function testLiquidateRefundsExcess() public {
         vm.startPrank(user1);
 
-        collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1000e8);
+        // Use USDC collateral
+        deal(address(usdc), user1, 2000e6);
+        usdc.approve(address(collateralManager), 2000e6);
+        collateralManager.depositERC20(address(usdc), 2000e6);
+
+        // Borrow 0.5 ETH
+        pool.borrow(0.5 ether);
 
         vm.stopPrank();
 
-        // Drop ETH price
-        ethFeed.setPrice(900e8);
-        ethFallback.setPrice(900e8);
+        // Increase ETH price to make unhealthy
+        ethFeed.setPrice(4200e8);
+        ethFallback.setPrice(4200e8);
 
         vm.startPrank(liquidator);
 
         uint256 balanceBefore = liquidator.balance;
 
-        // Pay more than needed
-        pool.liquidate{value: 2000e8}(user1);
+        // Pay more than needed (1 ETH instead of 0.5 ETH)
+        pool.liquidate{value: 1 ether}(user1);
 
         uint256 balanceAfter = liquidator.balance;
 
-        // Should refund 1000e8 excess
-        assertEq(balanceBefore - balanceAfter, 1000e8);
+        // Should refund 0.5 ETH excess
+        assertEq(balanceBefore - balanceAfter, 0.5 ether);
 
         vm.stopPrank();
     }
@@ -342,45 +352,56 @@ contract LendingPoolEdgeCasesTest is Test {
     function testLiquidateCalculatesCorrectBonus() public {
         vm.startPrank(user1);
 
-        collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1200e8);
+        // Use USDC collateral
+        deal(address(usdc), user1, 2000e6);
+        usdc.approve(address(collateralManager), 2000e6);
+        collateralManager.depositERC20(address(usdc), 2000e6);
+
+        // Borrow 0.90 ETH
+        pool.borrow(0.90 ether);
 
         vm.stopPrank();
 
-        // Drop ETH price
-        ethFeed.setPrice(1000e8);
-        ethFallback.setPrice(1000e8);
+        // Make unhealthy
+        ethFeed.setPrice(2200e8);
+        ethFallback.setPrice(2200e8);
 
         vm.prank(liquidator);
-        pool.liquidate{value: 1200e8}(user1);
+        pool.liquidate{value: 0.90 ether}(user1);
 
         // Debt should be cleared
         assertEq(pool.getBorrowedAmount(user1), 0);
 
-        // Collateral seized = debt + 10% bonus
-        // $1200 + $120 = $1320 worth of collateral
+        // Collateral seized = debt + 5% bonus
+        // 0.90 ETH @ $2200 = $2090, bonus = $104.5
+        // Total seized = $2194.5 worth of USDC
     }
 
     function testLiquidateUpdatesTotalBorrowed() public {
         vm.startPrank(user1);
 
-        collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1200e8);
+        // Use USDC collateral
+        deal(address(usdc), user1, 2000e6);
+        usdc.approve(address(collateralManager), 2000e6);
+        collateralManager.depositERC20(address(usdc), 2000e6);
+
+        // Borrow 0.90 ETH
+        pool.borrow(0.90 ether);
 
         vm.stopPrank();
 
-        // Drop ETH price
-        ethFeed.setPrice(1000e8);
-        ethFallback.setPrice(1000e8);
+        // Make unhealthy
+        ethFeed.setPrice(2200e8);
+        ethFallback.setPrice(2200e8);
 
         uint256 totalBefore = pool.totalBorrowed();
 
         vm.prank(liquidator);
-        pool.liquidate{value: 1200e8}(user1);
+        pool.liquidate{value: 0.90 ether}(user1);
 
         uint256 totalAfter = pool.totalBorrowed();
 
-        assertEq(totalBefore - totalAfter, 1200e8);
+        assertEq(totalBefore - totalAfter, 0.90 ether);
     }
 
     function testLiquidatePositionWithNoDebt() public {
@@ -395,20 +416,22 @@ contract LendingPoolEdgeCasesTest is Test {
         vm.startPrank(user1);
 
         collateralManager.depositETH{value: 1 ether}();
-        pool.borrow(1000e8);
+        // Borrow 0.5 ETH @ $2000 = $1000
+        pool.borrow(0.5 ether);
 
         uint256 hfBefore = pool.getHealthFactor(user1);
 
         vm.stopPrank();
 
-        // Increase ETH price
+        // Increase ETH price - both collateral AND debt increase
         ethFeed.setPrice(3000e8);
         ethFallback.setPrice(3000e8);
 
         uint256 hfAfter = pool.getHealthFactor(user1);
 
-        // Health factor should improve with higher collateral value
-        assertGt(hfAfter, hfBefore);
+        // With ETH collateral + ETH debt, HF stays constant when price changes
+        // Both scale together: (C_eth * price * LT) / (D_eth * price) = constant
+        assertEq(hfAfter, hfBefore);
     }
 
     function testHealthFactorWithMultipleUsers() public {

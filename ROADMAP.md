@@ -1,6 +1,6 @@
 # LendForge - Roadmap Développement
 
-**Version actuelle:** v4.3.0
+**Version actuelle:** v5.1.0
 **Dernière mise à jour:** 30 janvier 2025
 
 ---
@@ -38,41 +38,48 @@
 - Leverage mechanism documenté avec exemples
 - Alignment report: code vs spec validation
 
+**Frontend Phase 1 & 2 - Infrastructure** ✅
+- Next.js 15 + React 19 + TypeScript
+- RainbowKit v2 + wagmi v2 (Sepolia)
+- Apollo Client avec @apollo/experimental-nextjs-app-support
+- Landing page avec stats réelles (GET_GLOBAL_METRICS query)
+- Layout authenticated (Sidebar, Header, MobileNav)
+- Routes protection et navigation
+- Composants layout réutilisables (PageContainer, Section, ContentGrid)
+- Styles organization (Tailwind utility-first, globals.css minimal)
+
 ---
 
-## 🎯 Prochaine Priorité: Frontend Dashboard
+## 🎯 Prochaine Priorité: Frontend Phase 3 - Dashboard
 
 ### Objectif
-Créer interface utilisateur pour interagir avec le protocole (dépôt, emprunt, monitoring).
+Implémenter le dashboard principal avec données réelles et composants interactifs.
 
-### Fonctionnalités à Implémenter
+### Composants à Créer (Phase 3)
 
-**1. Connexion Wallet**
-- RainbowKit + wagmi v2
-- Support Sepolia testnet
-- Affichage balance utilisateur
+**1. Dashboard Page (`/dashboard`)**
+- TVLOverviewCard : TVL global + breakdown par asset (ETH/USDC/DAI)
+- UserPositionCard : Position utilisateur (collateral, dette, disponible)
+- HealthFactorDisplay : Gauge visuel + alertes si HF < 1.5
+- QuickActionsCard : Boutons CTA (Deposit, Borrow, Repay)
 
-**2. Dashboard Principal**
-- Vue positions utilisateur (collateral, dette, HF)
-- Alertes liquidation si HF < 1.5
-- TVL global du protocole
+**2. Hooks Custom**
+- `useUserPosition` : Fetch position depuis subgraph (query GET_USER_POSITION)
+- `useHealthFactor` : Calcul health factor temps réel
+- `useGlobalMetrics` : Déjà existe (GET_GLOBAL_METRICS)
 
-**3. Pages Dépôt/Emprunt**
-- Formulaires dépôt multi-collateral
-- Calcul temps réel max empruntable (LTV)
-- Validation transactions
+**3. Formules à Implémenter**
+- Health Factor : `(collateralUSD * liquidationThreshold) / borrowed`
+- Max Borrowable : `(collateralUSD * LTV) - currentBorrowed`
+- LTV Ratios : ETH 66%, USDC/DAI 75% (déjà dans lib/contracts/config.ts)
+- Liquidation Thresholds : ETH 83%, USDC/DAI 95%
 
-**4. Analytics**
-- Graphiques TVL historique (subgraph)
-- Liquidations récentes
-- Comparaison prix Chainlink vs CoinGecko
-
-### Critères de Succès
-- [ ] Connexion wallet fonctionnelle
-- [ ] Dépôt/retrait collateral opérationnel
-- [ ] Emprunt ETH avec calcul LTV temps réel
-- [ ] Affichage health factor dynamique
-- [ ] Graphiques analytics avec données réelles
+### Critères de Succès Phase 3
+- [ ] TVL global affiché avec breakdown par asset
+- [ ] Position utilisateur affichée (si existante)
+- [ ] Health factor calculé et affiché avec gauge
+- [ ] Alertes si HF < 1.5
+- [ ] Boutons CTA navigation vers Deposit/Borrow
 
 ---
 
@@ -84,17 +91,32 @@ Créer interface utilisateur pour interagir avec le protocole (dépôt, emprunt,
 - ✅ Tester cycle complet end-to-end
 - ✅ Validation: liquidation automatique réussie
 
-### Phase 2: Frontend Dashboard (1-2 semaines) 🚧
-- [ ] Setup Next.js 14 + RainbowKit + wagmi
-- [ ] Interface connexion wallet
+### Phase 2: Frontend Infrastructure ✅ (Complété v5.1.0)
+- ✅ Setup Next.js 15 + React 19 + RainbowKit + wagmi
+- ✅ Apollo Client avec Next.js App Router support
+- ✅ Landing page avec stats réelles (GraphQL query)
+- ✅ Layout authenticated (Sidebar, Header, navigation)
+- ✅ Routes protection
+- ✅ Composants layout réutilisables
+- ✅ Styles organization (Tailwind utility-first)
+
+### Phase 3: Dashboard Principal (En cours) 🚧
+- [ ] TVLOverviewCard avec breakdown par asset
+- [ ] UserPositionCard avec données utilisateur
+- [ ] HealthFactorDisplay avec gauge visuel
+- [ ] QuickActionsCard avec boutons CTA
+- [ ] Hooks custom (useUserPosition, useHealthFactor)
+
+### Phase 4: Formulaires Deposit/Borrow (À venir)
 - [ ] Page dépôt/retrait collateral
 - [ ] Page emprunt ETH avec calcul temps réel
-- [ ] Affichage health factor avec alertes
-- [ ] Dashboard analytics avec données mixtes :
-  - Graphiques The Graph (vraies données protocole)
-  - Prix CoinGecko API (display only, graphiques réalistes)
-  - Label clair distinction on-chain vs off-chain
-- [ ] Tests e2e avec Playwright (optionnel)
+- [ ] Hooks transactions (useDepositCollateral, useBorrow, useRepay)
+- [ ] Approval flow ERC20
+
+### Phase 5: Analytics (À venir)
+- [ ] Graphiques TVL historique (DailyMetrics)
+- [ ] Liquidations récentes
+- [ ] Prix assets (Chainlink vs CoinGecko - display only)
 
 ### Phase 3: Oracles Réels Sepolia (Optionnel - 2-3h)
 - [ ] Rechercher Chainlink feeds non-stale (USDC/DAI)
