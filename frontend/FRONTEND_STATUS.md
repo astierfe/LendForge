@@ -1,103 +1,227 @@
 # LendForge Frontend - Status
 
-**Date:** 30 janvier 2025
-**Version:** v5.1.0
-**Status:** Phase 1 & 2 Complétées ✅ | Phase 3 En cours 🚧
+**Date:** January 31, 2025
+**Version:** v5.3.0
+**Status:** Phase 1-3 Completed ✅ | Phase 4 Ready 🚀
 
 ---
 
-## Résumé
+## Summary
 
-Les **Phases 1 (Infrastructure)** et **Phase 2 (Connexion & Layout)** du frontend LendForge sont complétées avec succès. Le projet est configuré avec Next.js 15, React 19, Apollo GraphQL, RainbowKit, et wagmi v2.
+Frontend **Phases 1-3** completed successfully. LendForge now has a fully functional dashboard displaying user positions, collateral, borrowing data, and health factor with visual gauges. Next phase focuses on implementing the deposit flow with ERC20 approval handling.
 
 ---
 
-## ✅ Phase 1 : Infrastructure (Complétée)
+## ✅ Phase 1: Infrastructure (Completed)
 
-### 1.1 - Projet Next.js
-- ✅ Next.js 15 avec App Router
+### 1.1 - Next.js Project
+- ✅ Next.js 15 with App Router
 - ✅ React 19
-- ✅ TypeScript 5.x configuré
-- ✅ TailwindCSS installé et configuré
+- ✅ TypeScript 5.x configured
+- ✅ TailwindCSS installed and configured
 - ✅ ESLint setup
 
 ### 1.2 - Web3 Integration
-- ✅ RainbowKit v2 installé
-- ✅ wagmi v2 + viem installés
-- ✅ Configuration Sepolia testnet (`lib/wagmi.ts`)
+- ✅ RainbowKit v2 installed
+- ✅ wagmi v2 + viem installed
+- ✅ Sepolia testnet configured (`lib/wagmi.ts`)
 - ✅ Providers setup (`app/providers.tsx`)
 
 ### 1.3 - GraphQL (The Graph)
-- ✅ Apollo Client avec `@apollo/experimental-nextjs-app-support`
-- ✅ Client configuré (`lib/graphql/apollo-client.ts`)
-- ✅ Queries GraphQL créées et fonctionnelles (`lib/graphql/queries/metrics.ts`)
-- ✅ Query `GET_GLOBAL_METRICS` affiche données réelles sur landing page
+- ✅ Apollo Client with `@apollo/experimental-nextjs-app-support`
+- ✅ Client configured (`lib/graphql/apollo-client.ts`)
+- ✅ GraphQL queries created and working (`lib/graphql/queries/metrics.ts`)
+- ✅ Query `GET_GLOBAL_METRICS` displays real data on landing page
 
 ### 1.4 - ABIs & Addresses
-- ✅ ABIs copiés depuis `../out/` :
+- ✅ ABIs copied from `../out/`:
   - CollateralManager.json
   - LendingPool.json
   - OracleAggregator.json
   - ERC20.json
-- ✅ Addresses config créé (`lib/contracts/addresses.ts`)
-- ✅ Protocol config créé (`lib/contracts/config.ts`)
+- ✅ Addresses config created (`lib/contracts/addresses.ts`)
+- ✅ Protocol config created (`lib/contracts/config.ts`)
 
 ### 1.5 - shadcn/ui
-- ✅ shadcn CLI installé
-- ✅ Composants de base ajoutés :
+- ✅ shadcn CLI installed
+- ✅ Base components added:
   - Button, Card, Input, Badge, Alert
   - Toast, Skeleton, Tabs
 
 ---
 
-## ✅ Phase 2 : Connexion & Layout (Complétée)
+## ✅ Phase 2: Connection & Layout (Completed)
 
 ### 2.1 - Landing Page
-- ✅ Page d'accueil créée (`app/page.tsx`)
-- ✅ Hero section avec titre et description
+- ✅ Home page created (`app/page.tsx`)
+- ✅ Hero section with title and description
 - ✅ ConnectButton (RainbowKit wrapper)
-- ✅ Features Grid (3 cards : Multi-Asset, Secure Oracles, Transparent Metrics)
-- ✅ Stats Banner avec **données réelles** depuis subgraph (TVL, Active Positions, Total Borrowed)
-- ✅ Redirect automatique vers `/dashboard` si wallet connectée
-- ✅ Conversion BigInt (Wei → ETH) pour affichage
+- ✅ Features Grid (3 cards: Multi-Asset, Secure Oracles, Transparent Metrics)
+- ✅ Stats Banner with **real data** from subgraph (TVL, Active Positions, Total Borrowed)
+- ✅ Auto-redirect to `/dashboard` if wallet connected
+- ✅ BigInt conversion (Wei → ETH) for display
 
-### 2.2 - Layout Authenticated
-- ✅ Route group `(authenticated)/` créée
-- ✅ Layout avec Sidebar + Header (`app/(authenticated)/layout.tsx`)
-- ✅ Protection route (redirect si non connecté)
-- ✅ Composants layout :
-  - `Sidebar.tsx` - Navigation desktop
-  - `Header.tsx` - Header avec NetworkBadge + ConnectButton
-  - `MobileNav.tsx` - Menu mobile responsive
+### 2.2 - Authenticated Layout
+- ✅ Route group `(authenticated)/` created
+- ✅ Layout with Sidebar + Header (`app/(authenticated)/layout.tsx`)
+- ✅ Route protection (redirect if not connected)
+- ✅ Layout components:
+  - `Sidebar.tsx` - Desktop navigation
+  - `Header.tsx` - Header with NetworkBadge + ConnectButton
+  - `MobileNav.tsx` - Responsive mobile menu
 
 ### 2.3 - Navigation Routing
-- ✅ Pages placeholders créées :
-  - `/dashboard` - Dashboard principal
-  - `/deposit` - Déposer collateral
-  - `/borrow` - Emprunter ETH
-  - `/positions` - Mes positions
-  - `/analytics` - Analytiques
-- ✅ Navigation links dans Sidebar
-- ✅ Highlight page active
+- ✅ Placeholder pages created:
+  - `/dashboard` - Main dashboard
+  - `/deposit` - Deposit collateral
+  - `/borrow` - Borrow ETH
+  - `/positions` - My positions
+  - `/analytics` - Analytics
+- ✅ Navigation links in Sidebar
+- ✅ Active page highlight
 
 ---
 
-## Fichiers Créés
+## ✅ Phase 3: Dashboard Components (Completed v5.3.0)
+
+### 3.1 - Data Hooks
+**`hooks/useUserPosition.ts`**
+- ✅ Fetches user position from subgraph
+- ✅ Returns: collateral, borrowed, activePositions, collaterals array
+- ✅ Includes formatters: `weiToEth`, `usdToNumber`, `tokenToNumber`
+- ✅ Helper flags: `hasPosition`, `hasDeposits`, `hasActiveBorrow`
+
+**`hooks/useHealthFactor.ts`**
+- ✅ Calculates health factor from user position
+- ✅ Returns: value, level (safe/warning/danger/liquidation), percentage, color, label, canBorrow
+- ✅ Formula: `(collateralUSD × liquidationThreshold) / borrowed`
+- ✅ Helper: `calculateMaxBorrowable()` with weighted LTV calculation
+- ✅ **Bug Fixed**: Now returns max borrowable (not available), uses proper weighted average
+
+### 3.2 - Dashboard Cards
+
+**`components/dashboard/TVLOverviewCard.tsx`**
+- ✅ Displays user's total collateral in USD
+- ✅ Asset breakdown by ETH, USDC, DAI with percentages
+- ✅ Progress bar visualization
+- ✅ Empty state for users without deposits
+
+**`components/dashboard/UserPositionCard.tsx`**
+- ✅ Shows total borrowed (ETH + USD)
+- ✅ Displays available to borrow (calculated from max borrowable)
+- ✅ Shows current LTV used (%)
+- ✅ Warning alert when LTV >= 80%
+- ✅ Links to borrow and repay pages
+- ✅ Empty state with "Start Borrowing" CTA
+
+**`components/dashboard/HealthFactorDisplay.tsx`**
+- ✅ Semi-circular gauge visual (speedometer style)
+- ✅ Color-coded risk levels (green/yellow/orange/red)
+- ✅ Needle indicator pointing to current HF
+- ✅ Threshold markers: 1.0, 1.2, 1.5, 2.0, 3.0
+- ✅ Contextual risk explanations (Safe/Warning/Danger/Liquidation)
+- ✅ Thresholds reference card
+- ✅ Empty state for users without borrows
+
+**`components/dashboard/QuickActionsCard.tsx`**
+- ✅ Three CTA buttons: Deposit, Borrow, Repay
+- ✅ Contextual enable/disable logic:
+  - Deposit: Always enabled
+  - Borrow: Enabled if hasDeposits AND canBorrow (HF >= 1.5)
+  - Repay: Enabled if hasActiveBorrow
+- ✅ Navigation to respective pages
+
+### 3.3 - Dashboard Layout
+- ✅ Responsive 2-column grid (`lg:grid-cols-2`)
+- ✅ Mobile: 1 card per row (stacked)
+- ✅ Desktop: 2 cards per row
+- ✅ Card order: TVL → Position → Health Factor → Quick Actions
+
+### 3.4 - Test Pages (for development)
+- ✅ `/test-hooks` - Test all hooks
+- ✅ `/test-quick-actions` - Test QuickActionsCard states
+- ✅ `/test-user-position-card` - Test UserPositionCard calculations
+- ✅ `/test-health-factor` - Test HealthFactorDisplay gauge
+
+---
+
+## 🚀 Phase 4: Deposit Flow (Next - Estimated 2 days)
+
+### Objective
+Implement deposit page with asset selection, amount input, ERC20 approval flow, and transaction handling.
+
+### Components to Create
+
+**1. `components/forms/AssetSelector.tsx`**
+- Tab-based UI for ETH, USDC, DAI selection
+- Display balance and price for selected asset
+- Emit `onAssetChange` callback
+
+**2. `components/forms/AmountInput.tsx`**
+- Input field with number validation
+- MAX button to fill with user balance
+- USD value preview
+- Error states (insufficient balance, invalid amount)
+
+**3. `components/forms/DepositForm.tsx`**
+- Main form component orchestrating deposit flow
+- ERC20 approval flow:
+  - Check allowance
+  - Approve if needed (max uint256)
+  - Enable deposit button after approval
+- ETH deposits (no approval needed)
+- Position preview (new collateral, max borrowable, health factor)
+- Transaction handling (loading, success, error)
+
+**4. `app/(authenticated)/deposit/page.tsx`**
+- Deposit page layout
+- Imports and renders DepositForm
+- Success/error toasts
+
+### Technical Requirements
+- Create minimal ERC20 ABI (approve, allowance, balanceOf)
+- Use wagmi hooks: `useWriteContract`, `useWaitForTransactionReceipt`, `useReadContract`
+- Handle ETH vs ERC20 differences (value parameter)
+- Parse decimals correctly (ETH/DAI: 18, USDC: 6)
+- Calculate position preview using existing hooks
+
+### Key Formulas
+```typescript
+// New collateral value
+newCollateralUSD = currentCollateralUSD + (depositAmount × assetPrice)
+
+// Max borrowable with new collateral
+newMaxBorrowableUSD = newCollateralUSD × (LTV / 100)
+
+// Available to borrow
+newAvailableToBorrow = newMaxBorrowableUSD - currentBorrowedUSD
+
+// New health factor (if has debt)
+newHF = (newCollateralUSD × liquidationThreshold) / currentBorrowed
+```
+
+---
+
+## Files Created
 
 ```
 frontend/
 ├── app/
-│   ├── layout.tsx (✅ modifié - Providers + Toaster)
-│   ├── page.tsx (✅ Landing page complète)
+│   ├── layout.tsx (✅ modified - Providers + Toaster)
+│   ├── page.tsx (✅ Landing page complete)
 │   ├── providers.tsx (✅ RainbowKit + wagmi)
 │   │
 │   └── (authenticated)/
-│       ├── layout.tsx (✅ Layout avec Sidebar)
-│       ├── dashboard/page.tsx (✅)
-│       ├── deposit/page.tsx (✅)
-│       ├── borrow/page.tsx (✅)
-│       ├── positions/page.tsx (✅)
-│       └── analytics/page.tsx (✅)
+│       ├── layout.tsx (✅ Layout with Sidebar)
+│       ├── dashboard/page.tsx (✅ Phase 3 complete)
+│       ├── deposit/page.tsx (⏳ Phase 4)
+│       ├── borrow/page.tsx (placeholder)
+│       ├── positions/page.tsx (placeholder)
+│       ├── analytics/page.tsx (placeholder)
+│       ├── test-hooks/page.tsx (✅)
+│       ├── test-quick-actions/page.tsx (✅)
+│       ├── test-user-position-card/page.tsx (✅)
+│       └── test-health-factor/page.tsx (✅)
 │
 ├── components/
 │   ├── wallet/
@@ -105,112 +229,76 @@ frontend/
 │   │   ├── NetworkBadge.tsx (✅)
 │   │   └── WalletInfo.tsx (✅)
 │   │
-│   └── layout/
-│       ├── Sidebar.tsx (✅)
-│       ├── Header.tsx (✅)
-│       └── MobileNav.tsx (✅)
+│   ├── layout/
+│   │   ├── Sidebar.tsx (✅)
+│   │   ├── Header.tsx (✅)
+│   │   ├── PageContainer.tsx (✅)
+│   │   └── MobileNav.tsx (✅)
+│   │
+│   ├── dashboard/ (✅ Phase 3)
+│   │   ├── TVLOverviewCard.tsx
+│   │   ├── UserPositionCard.tsx
+│   │   ├── HealthFactorDisplay.tsx
+│   │   └── QuickActionsCard.tsx
+│   │
+│   └── forms/ (⏳ Phase 4)
+│       ├── AssetSelector.tsx
+│       ├── AmountInput.tsx
+│       └── DepositForm.tsx
+│
+├── hooks/
+│   ├── useUserPosition.ts (✅)
+│   └── useHealthFactor.ts (✅ with bug fix)
 │
 ├── lib/
 │   ├── contracts/
-│   │   ├── abis/ (✅ 4 ABIs copiés)
+│   │   ├── abis/ (✅ 4 ABIs)
 │   │   ├── addresses.ts (✅)
 │   │   └── config.ts (✅)
 │   │
 │   ├── graphql/
 │   │   ├── client.ts (✅)
 │   │   └── queries/
-│   │       └── metrics.ts (✅ 4 queries)
+│   │       └── metrics.ts (✅ 6 queries)
 │   │
 │   ├── wagmi.ts (✅)
-│   └── utils.ts (✅ shadcn default)
+│   └── utils.ts (✅)
 │
-└── .env.local (✅ configuré)
+└── .env.local (✅)
 ```
 
 ---
 
-## ✅ Problèmes Résolus
+## Known Issues & Solutions
 
-### 1. Apollo Client avec Next.js 15
-**Solution:** Installation de `@apollo/experimental-nextjs-app-support`
-- Import `ApolloClient` et `InMemoryCache` depuis `@apollo/experimental-nextjs-app-support`
-- Import `useSuspenseQuery` depuis `@apollo/experimental-nextjs-app-support/ssr`
-- Fonctionnement parfait avec Next.js 15 App Router
+### 1. Apollo Client with Next.js 15
+**Solution:** Install `@apollo/experimental-nextjs-app-support`
+- Import from `@apollo/experimental-nextjs-app-support`
+- Use `useSuspenseQuery` for server components
 
 ### 2. GraphQL Schema Mismatch
-**Solution:** Correction des queries pour correspondre au schéma subgraph réel
+**Solution:** Align queries with actual subgraph schema
 - `totalCollateralUSD` → `currentTVL` (BigInt)
 - `totalBorrowed` → `currentBorrowed` (BigInt)
-- `totalActivePositions` → `activePositions`
-- Conversion BigInt: `parseFloat(value) / 1e18`
+- Convert BigInt: `parseFloat(value) / 1e18`
 
-### 3. wagmi v2 API Changes
-**Solution:** Utilisé `useChainId()` + `useAccount()` à la place de `useNetwork()`
+### 3. calculateMaxBorrowable Bug (Fixed v5.3.0)
+**Issue:** Returned available amount instead of max borrowable, used simple average LTV
+**Solution:**
+- Return `maxBorrowableUSD` instead of `availableUSD`
+- Implement weighted LTV calculation based on collateral USD values
 
-### 4. Styles Organization
-**Solution:** Composants layout réutilisables créés
-- `PageContainer` : `flex-1 p-6 space-y-6`
-- `Section` : Vertical spacing (sm/md/lg)
-- `ContentGrid` : Responsive grids
-
----
-
-## 🎯 Prochaines Étapes (Phase 3)
-
-### Phase 3 : Dashboard (2 jours estimés)
-
-**Objectif:** Implémenter le dashboard principal avec métriques et position utilisateur
-
-**À créer:**
-1. `components/dashboard/TVLOverviewCard.tsx`
-   - Afficher TVL total + breakdown par asset (ETH/USDC/DAI)
-   - Query: `GET_GLOBAL_METRICS`
-
-2. `components/dashboard/UserPositionCard.tsx`
-   - Afficher collateral, dette, disponible à emprunter
-   - Query: `GET_USER_POSITION`
-
-3. `components/dashboard/HealthFactorDisplay.tsx`
-   - Gauge visuel health factor
-   - Alertes si HF < 1.5
-   - Logic: `hooks/useHealthFactor.ts`
-
-4. `components/dashboard/QuickActionsCard.tsx`
-   - Boutons CTA (Deposit, Borrow, Repay)
-   - Navigation vers pages correspondantes
-
-5. `components/dashboard/AssetBreakdown.tsx`
-   - Liste assets avec valeurs USD
-   - Icons ETH/USDC/DAI
-
-**Hooks à créer:**
-- `hooks/useUserPosition.ts` - Fetch position subgraph + on-chain
-- `hooks/useHealthFactor.ts` - Calcul health factor
-- `hooks/useGlobalMetrics.ts` - Fetch TVL global
+### 4. Subgraph valueUSD Bug
+**Known Issue:** Collateral `valueUSD` shows total instead of per-asset
+**Workaround:** Calculate manually: `amount × price`
 
 ---
 
-## Commandes Test
-
-```bash
-# Lancer dev server
-cd frontend
-npm run dev
-
-# Build production
-npm run build
-
-# Vérifier erreurs TypeScript
-npx tsc --noEmit
-```
-
----
-
-## Variables d'Environnement Configurées
+## Environment Variables
 
 ```env
 NEXT_PUBLIC_SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/...
-NEXT_PUBLIC_SUBGRAPH_URL=https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
+NEXT_PUBLIC_SUBGRAPH_URL=https://api.studio.thegraph.com/query/122308/lendforge-v-5/version/latest
 NEXT_PUBLIC_COLLATERAL_MANAGER_ADDRESS=0x53Ea723AA0C4cd5eF459eE9351D3f9875D821758
 NEXT_PUBLIC_LENDING_POOL_ADDRESS=0x06AF08708B45968492078A1900124DaA832082cD
 NEXT_PUBLIC_ORACLE_AGGREGATOR_ADDRESS=0x62f41B1EDc66bC46e05c34AC40B447E5A7ab3EAe
@@ -221,69 +309,16 @@ NEXT_PUBLIC_DAI_ADDRESS=0x2FA332E8337642891885453Fd40a7a7Bb010B71a
 
 ---
 
----
+## Roadmap
 
-## 🚧 Phase 3 : Dashboard (En cours)
-
-### Objectif
-Implémenter le dashboard principal avec données réelles et composants interactifs.
-
-### Composants à Créer
-
-**1. TVLOverviewCard**
-- TVL global avec breakdown par asset (ETH/USDC/DAI)
-- Utilise query `GET_GLOBAL_METRICS` (déjà existante)
-- Affichage : Total + 3 sous-totaux
-
-**2. UserPositionCard**
-- Position utilisateur : collateral, dette, disponible à emprunter
-- Query à créer : `GET_USER_POSITION` (dans `lib/graphql/queries/metrics.ts`)
-- Empty state si pas de position
-
-**3. HealthFactorDisplay**
-- Gauge visuel avec niveau (Safe/Warning/Danger)
-- Formule : `(collateralUSD * liquidationThreshold) / borrowed`
-- Alertes si HF < 1.5
-- Hook : `useHealthFactor`
-
-**4. QuickActionsCard**
-- 3 boutons : Deposit, Borrow, Repay
-- Navigation vers pages correspondantes
-
-### Hooks Custom à Créer
-
-**`hooks/useUserPosition.ts`**
-```typescript
-// Fetch position utilisateur depuis subgraph
-// Input: wallet address
-// Output: { collateral, borrowed, healthFactor, loading, error }
-```
-
-**`hooks/useHealthFactor.ts`**
-```typescript
-// Calcul health factor temps réel
-// Formule: (collateralUSD * liquidationThreshold) / borrowed
-// Utilise lib/contracts/config.ts pour thresholds
-```
-
-### Formules (déjà dans `lib/contracts/config.ts`)
-
-- **LTV Ratios** : ETH 66%, USDC/DAI 75%
-- **Liquidation Thresholds** : ETH 83%, USDC/DAI 95%
-- **Health Factor** : `(totalCollateralUSD * liquidationThreshold) / totalBorrowed`
-- **Max Borrowable** : `(totalCollateralUSD * LTV) - currentBorrowed`
-
-### Ordre d'Implémentation
-
-1. Query `GET_USER_POSITION` dans `lib/graphql/queries/metrics.ts`
-2. Hook `useUserPosition.ts`
-3. Hook `useHealthFactor.ts`
-4. Composant `HealthFactorDisplay.tsx` (le plus complexe)
-5. Composant `TVLOverviewCard.tsx` (réutilise GET_GLOBAL_METRICS)
-6. Composant `UserPositionCard.tsx`
-7. Composant `QuickActionsCard.tsx`
-8. Assembler dans `/dashboard/page.tsx`
+- ✅ **Phase 1**: Infrastructure (Next.js + Web3 + GraphQL)
+- ✅ **Phase 2**: Connection & Layout (Landing + Authenticated Layout)
+- ✅ **Phase 3**: Dashboard (4 cards: TVL, Position, Health Factor, Quick Actions)
+- 🚀 **Phase 4**: Deposit Flow (AssetSelector + AmountInput + DepositForm)
+- ⏳ **Phase 5**: Borrow Flow (BorrowForm + Health Factor Preview)
+- ⏳ **Phase 6**: Analytics (TVL Chart + Liquidations Table)
+- ⏳ **Phase 7**: Polish (Loading states + Error handling + Toasts)
 
 ---
 
-**Status:** ✅ Phases 1 & 2 Complètes | 🚧 Phase 3 Prête à démarrer
+**Status:** ✅ Phase 1-3 Complete | 🚀 Phase 4 Ready to Start

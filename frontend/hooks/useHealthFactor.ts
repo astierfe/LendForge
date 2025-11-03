@@ -93,8 +93,10 @@ export function useHealthFactor(): HealthFactorData | null {
       return null;
     }
 
-    // Parse health factor - contract returns it scaled by 1e18
-    const hf = parseFloat(activePosition.healthFactor) / 1e18;
+    // Parse health factor from subgraph
+    // Note: Subgraph already converts it from contract format (multiplied by 100)
+    // to decimal format (e.g., 15.12). See lending-pool.ts:134
+    const hf = parseFloat(activePosition.healthFactor);
 
     // Determine risk level
     let level: HealthFactorLevel;
@@ -154,26 +156,24 @@ export function calculateMaxBorrowable(
 ): number {
   if (!collaterals.length) return 0;
 
-  const collateralUSD = parseFloat(totalCollateralUSD) / 1e8; // USD has 8 decimals (Chainlink)
-  const borrowedETH = parseFloat(currentBorrowed) / 1e18; // ETH has 18 decimals
+  // Calculate weighted LTV based on collateral USD values
+  // This is the proper weighted average calculation
+  let totalWeightedLTV = 0;
 
-  // Calculate weighted LTV (simplified - using average)
-  // Real contract uses weighted average based on collateral amounts
-  const avgLTV = collaterals.reduce((sum, col) => {
-    return sum + (col.asset.ltv / 100);
-  }, 0) / collaterals.length;
+  for (const col of collaterals) {
+    // Parse collateral value (8 decimals for USD)
+    const colValueUSD = parseFloat(col.valueUSD) / 1e8;
+    const colLTV = col.asset.ltv / 100; // Convert percentage to decimal
 
-  // IMPORTANT: This is a simplified calculation that returns USD
-  // To convert to ETH, we need the ETH/USD price from oracle
-  // For now, we assume borrowedETH is negligible or use (maxUSD / ETH_price)
-  // TODO: Fetch ETH price and convert properly
-  const maxBorrowableUSD = collateralUSD * avgLTV;
+    // Weight the LTV by the collateral's USD value
+    totalWeightedLTV += colValueUSD * colLTV;
+  }
 
-  // Rough approximation: assume borrowedETH * $2500 for ETH price
-  const borrowedUSD = borrowedETH * 2500; // Hardcoded ETH price for now
-  const availableUSD = maxBorrowableUSD - borrowedUSD;
+  // Calculate max borrowable using weighted LTV
+  // Note: totalWeightedLTV already accounts for the weighting, so we don't divide by collateralUSD
+  const maxBorrowableUSD = totalWeightedLTV;
 
-  return Math.max(0, availableUSD); // Cannot be negative, returns USD
+  return maxBorrowableUSD; // Return max borrowable in USD
 }
 
 /**

@@ -1,0 +1,63 @@
+feat(frontend): Complete Phase 3 - Dashboard components with user position tracking
+
+## Summary
+Implemented all 4 dashboard cards to display user collateral, borrowing position,
+health factor gauge, and quick action buttons. Fixed critical bug in max borrowable
+calculation and added responsive 2-column grid layout.
+
+## Components Added
+- **UserPositionCard**: Displays total borrowed, available to borrow, and LTV usage
+  - Shows ETH borrowed with USD conversion
+  - Calculates available borrowing capacity
+  - Warns when LTV usage >= 80%
+  - Links to borrow/repay pages
+
+- **HealthFactorDisplay**: Visual gauge component for account health
+  - Semi-circular gauge with color-coded risk levels
+  - Needle indicator pointing to current HF value
+  - Threshold markers at 1.0, 1.2, 1.5, 2.0, 3.0
+  - Contextual risk explanations (Safe/Warning/Danger/Liquidation)
+  - Empty state for users without active borrows
+
+## Bug Fixes
+- Fixed `calculateMaxBorrowable()` in useHealthFactor.ts:
+  - Now returns max borrowable amount (not available amount)
+  - Implements proper weighted LTV calculation based on collateral USD values
+  - Correctly calculates borrowing capacity for multi-asset collateral
+
+## Layout Improvements
+- Dashboard now uses responsive 2-column grid (lg:grid-cols-2)
+- Mobile: 1 card per row (stacked vertically)
+- Desktop: 2 cards per row
+- Maintains proper spacing and visual hierarchy
+
+## Test Pages
+- `/test-user-position-card` - Test borrowing position display
+- `/test-health-factor` - Test health factor gauge and risk levels
+
+## Files Changed
+- frontend/components/dashboard/UserPositionCard.tsx (new)
+- frontend/components/dashboard/HealthFactorDisplay.tsx (new)
+- frontend/hooks/useHealthFactor.ts (bug fix)
+- frontend/app/(authenticated)/dashboard/page.tsx (layout update)
+- frontend/app/(authenticated)/test-user-position-card/page.tsx (new)
+- frontend/app/(authenticated)/test-health-factor/page.tsx (new)
+
+## Technical Details
+- Uses useUserPosition and useHealthFactor hooks for data
+- Implements proper weighted LTV calculation for multi-collateral
+- ETH price hardcoded at $2,500 (to be replaced with oracle integration)
+- SVG-based gauge with responsive viewBox
+- Tailwind CSS for responsive design
+
+## Breaking Changes
+None
+
+## Migration Required
+None
+
+Closes Phase 3 of frontend development roadmap.
+
+---
+
+Tag: v5.3.0
