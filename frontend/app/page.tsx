@@ -14,15 +14,19 @@ interface GlobalMetric {
   id: string;
   currentTVL: string; // BigInt from subgraph
   currentBorrowed: string; // BigInt from subgraph
-  activePositions: number;
   totalETHDeposited: string; // BigInt
   totalUSDCDeposited: string; // BigInt
   totalDAIDeposited: string; // BigInt
   updatedAt: string; // BigInt timestamp
 }
 
+interface ActiveUser {
+  id: string;
+}
+
 interface GlobalMetricsData {
   globalMetrics: GlobalMetric[];
+  activeUsers: ActiveUser[]; // Users with activePositions > 0
 }
 
 export default function LandingPage() {
@@ -41,6 +45,7 @@ export default function LandingPage() {
   }, [isConnected, router]);
 
   const globalMetrics = data?.globalMetrics?.[0];
+  const activePositionsCount = data?.activeUsers?.length || 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -131,7 +136,7 @@ export default function LandingPage() {
                   <Skeleton className="h-8 w-32" />
                 ) : (
                   <p className="text-3xl font-bold">
-                    ${globalMetrics?.currentTVL ? (parseFloat(globalMetrics.currentTVL) / 1e18).toFixed(2) : '0'}
+                    ${globalMetrics?.currentTVL ? (parseFloat(globalMetrics.currentTVL) / 1e8).toFixed(2) : '0'}
                   </p>
                 )}
               </CardContent>
@@ -146,7 +151,7 @@ export default function LandingPage() {
                   <Skeleton className="h-8 w-20" />
                 ) : (
                   <p className="text-3xl font-bold">
-                    {globalMetrics?.activePositions || 0}
+                    {activePositionsCount}
                   </p>
                 )}
               </CardContent>

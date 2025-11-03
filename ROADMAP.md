@@ -1,6 +1,6 @@
 # LendForge - Roadmap Développement
 
-**Version actuelle:** v5.1.0
+**Version actuelle:** v5.2.0
 **Dernière mise à jour:** 30 janvier 2025
 
 ---
@@ -9,20 +9,20 @@
 
 ### ✅ Complété et Validé
 
-**Smart Contracts (Solidity) - v3.1**
+**Smart Contracts (Solidity) - v4.1**
 - CollateralManager v1.1 - Multi-collateral (ETH, USDC, DAI)
-- LendingPool v3.0 - Emprunts ETH avec gestion santé
+- LendingPool v4.1 - Fixed ETH-to-USD conversion in borrow validation
 - OracleAggregator v3.1 - Fallback Chainlink/Uniswap avec emergency mode
 - PriceRegistry v1.1 - Routage des price providers
-- Tests: 69 tests unitaires + intégration PASS
+- Tests: 59 tests unitaires + intégration PASS
 - Déployé sur Sepolia Testnet
 
-**The Graph Subgraph - v4.10.0**
+**The Graph Subgraph - v4.11.1-fix-activePositions**
 - GlobalMetric: TVL total + TVL par asset (ETH/USDC/DAI)
 - DailyMetric: Métriques quotidiennes complètes
 - Position lifecycle: Status ACTIVE/REPAID/LIQUIDATED
 - Tests: 18 tests Matchstick PASS
-- Bug fixes: position status reactivation, totalCollateralUSD tracking
+- Bug fixes: position status reactivation, totalCollateralUSD tracking, user.activePositions counter
 - Déployé et indexé sur The Graph Studio
 
 **Bot Python - Opérationnel** ✅
@@ -194,11 +194,11 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
 
 ### Contracts Sepolia
 - CollateralManager: `0x53Ea723AA0C4cd5eF459eE9351D3f9875D821758`
-- LendingPool: `0x06AF08708B45968492078A1900124DaA832082cD`
+- LendingPool: `0x504BD0CcAF75881CfCD8f432983A56A5C4e5Aa84` (v4.1)
 - OracleAggregator: `0x62f41B1EDc66bC46e05c34AC40B447E5A7ab3EAe`
 
 ### The Graph Endpoint
-- Subgraph v4.8.0: https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
+- Subgraph v4.11.1-fix-activePositions: https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
 
 ---
 
@@ -209,6 +209,10 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
 - Multi-collateral: ETH, USDC, DAI
 - Oracle fallback Chainlink → Uniswap TWAP
 - Bot Python (pas de bot TypeScript)
+- **Unified Position Model**: Un user = une position globale (MVP v5.2.0)
+  - Design choice: Simplicité pour MVP
+  - Limitation: Pas de positions multiples par user
+  - Future upgrade: Multiple Positions planned for v6.0+
 
 ### Tests
 - Matchstick pour subgraph (pas de tests manuels)
@@ -219,3 +223,13 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
 - Sepolia pour testnet
 - The Graph Studio (pas de hosted service)
 - FastAPI pour bot (API REST exposée)
+
+### Roadmap Future
+
+**v6.0 - Multiple Positions Support** (Planned)
+- Refactor LendingPool: `mapping(address => mapping(bytes32 => Position))`
+- Refactor Subgraph: `Position.id = user.id + "-" + positionIndex`
+- Allow users to create isolated positions with different risk profiles
+- Enable partial liquidations per position
+- Support advanced strategies (hedging, arbitrage)
+- Estimated effort: 1-2 weeks (contracts + subgraph + frontend)

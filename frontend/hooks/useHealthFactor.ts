@@ -93,7 +93,8 @@ export function useHealthFactor(): HealthFactorData | null {
       return null;
     }
 
-    const hf = parseFloat(activePosition.healthFactor);
+    // Parse health factor - contract returns it scaled by 1e18
+    const hf = parseFloat(activePosition.healthFactor) / 1e18;
 
     // Determine risk level
     let level: HealthFactorLevel;
@@ -139,12 +140,12 @@ export function useHealthFactor(): HealthFactorData | null {
 /**
  * Calculate maximum borrowable amount based on collateral
  *
- * Formula: (totalCollateralUSD * weightedLTV) - currentBorrowed
+ * Formula: (totalCollateralUSD * weightedLTV) - currentBorrowedUSD
  *
- * @param totalCollateralUSD - Total collateral in USD (Wei as string)
- * @param currentBorrowed - Current borrowed amount (Wei as string)
+ * @param totalCollateralUSD - Total collateral in USD (8 decimals as string)
+ * @param currentBorrowed - Current borrowed amount in ETH (18 decimals as string)
  * @param collaterals - User collaterals for weighted LTV
- * @returns Maximum borrowable in ETH (number)
+ * @returns Maximum borrowable in USD (number)
  */
 export function calculateMaxBorrowable(
   totalCollateralUSD: string,
@@ -153,8 +154,8 @@ export function calculateMaxBorrowable(
 ): number {
   if (!collaterals.length) return 0;
 
-  const collateralUSD = parseFloat(totalCollateralUSD) / 1e18;
-  const borrowed = parseFloat(currentBorrowed) / 1e18;
+  const collateralUSD = parseFloat(totalCollateralUSD) / 1e8; // USD has 8 decimals (Chainlink)
+  const borrowedETH = parseFloat(currentBorrowed) / 1e18; // ETH has 18 decimals
 
   // Calculate weighted LTV (simplified - using average)
   // Real contract uses weighted average based on collateral amounts
@@ -162,9 +163,17 @@ export function calculateMaxBorrowable(
     return sum + (col.asset.ltv / 100);
   }, 0) / collaterals.length;
 
-  const maxBorrowable = collateralUSD * avgLTV - borrowed;
+  // IMPORTANT: This is a simplified calculation that returns USD
+  // To convert to ETH, we need the ETH/USD price from oracle
+  // For now, we assume borrowedETH is negligible or use (maxUSD / ETH_price)
+  // TODO: Fetch ETH price and convert properly
+  const maxBorrowableUSD = collateralUSD * avgLTV;
 
-  return Math.max(0, maxBorrowable); // Cannot be negative
+  // Rough approximation: assume borrowedETH * $2500 for ETH price
+  const borrowedUSD = borrowedETH * 2500; // Hardcoded ETH price for now
+  const availableUSD = maxBorrowableUSD - borrowedUSD;
+
+  return Math.max(0, availableUSD); // Cannot be negative, returns USD
 }
 
 /**

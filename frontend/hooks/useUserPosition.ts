@@ -101,6 +101,16 @@ export function useUserPosition() {
 }
 
 /**
+ * Asset decimals mapping (workaround for subgraph bug)
+ * Subgraph incorrectly stores decimals=18 for all assets
+ */
+const ASSET_DECIMALS: Record<string, number> = {
+  ETH: 18,
+  USDC: 6,  // USDC uses 6 decimals, not 18
+  DAI: 18,
+};
+
+/**
  * Helper functions to convert BigInt strings to numbers
  */
 export const formatters = {
@@ -114,22 +124,25 @@ export const formatters = {
   },
 
   /**
-   * Convert USD BigInt (18 decimals) to number
-   * @param usd - USD amount as BigInt string (e.g., "1000000000000000000")
+   * Convert USD BigInt (8 decimals - Chainlink standard) to number
+   * @param usd - USD amount as BigInt string (e.g., "100000000")
    * @returns USD amount as number (e.g., 1.0)
    */
   usdToNumber: (usd: string): number => {
-    return parseFloat(usd) / 1e18;
+    return parseFloat(usd) / 1e8;
   },
 
   /**
    * Convert token amount (BigInt string) to number based on decimals
    * @param amount - Token amount as string
    * @param decimals - Token decimals (18 for ETH/DAI, 6 for USDC)
+   * @param symbol - Optional symbol to override decimals (workaround for subgraph bug)
    * @returns Token amount as number
    */
-  tokenToNumber: (amount: string, decimals: number): number => {
-    return parseFloat(amount) / Math.pow(10, decimals);
+  tokenToNumber: (amount: string, decimals: number, symbol?: string): number => {
+    // Use correct decimals from mapping if symbol provided
+    const actualDecimals = symbol && ASSET_DECIMALS[symbol] ? ASSET_DECIMALS[symbol] : decimals;
+    return parseFloat(amount) / Math.pow(10, actualDecimals);
   },
 
   /**
