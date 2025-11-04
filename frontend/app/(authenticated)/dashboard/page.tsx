@@ -45,9 +45,27 @@ export default function DashboardPage() {
             <Link href="/test-health-factor">
               <Button variant="outline" size="sm" className="gap-2">
                 <FlaskConical className="w-4 h-4" />
-                factor Test Health
+                  factor Test Health
               </Button>
-            </Link>            
+            </Link>               
+            <Link href="/test-asset-selector">
+              <Button variant="outline" size="sm" className="gap-2">
+                <FlaskConical className="w-4 h-4" />
+                  test-asset-selector
+              </Button>                           
+            </Link>    
+            <Link href="/test-amount-input">
+              <Button variant="outline" size="sm" className="gap-2">
+                <FlaskConical className="w-4 h-4" />
+                  test-amount-input
+              </Button>                           
+            </Link>          
+            <Link href="/test-deposit-form">
+              <Button variant="outline" size="sm" className="gap-2">
+                <FlaskConical className="w-4 h-4" />
+                  test-deposit-form
+              </Button>                           
+            </Link>                       
           </div>
         </div>
       </PageContainer>

@@ -1,7 +1,7 @@
 # LendForge - Roadmap Développement
 
-**Version actuelle:** v5.2.0
-**Dernière mise à jour:** 30 janvier 2025
+**Version actuelle:** v5.2.3
+**Dernière mise à jour:** 4 novembre 2025
 
 ---
 
@@ -48,38 +48,59 @@
 - Composants layout réutilisables (PageContainer, Section, ContentGrid)
 - Styles organization (Tailwind utility-first, globals.css minimal)
 
+**Frontend Phase 3 - Dashboard** ✅
+- TVLOverviewCard avec breakdown par asset (ETH/USDC/DAI)
+- UserPositionCard avec position utilisateur complète
+- HealthFactorDisplay avec gauge visuel et alertes
+- QuickActionsCard avec navigation
+- Hooks: useUserPosition, useHealthFactor, useGlobalMetrics
+- Formules: Health Factor, Max Borrowable, LTV ratios
+- Tests validés avec données réelles Sepolia
+
+**Frontend Phase 4 - Deposit Flow** ✅ (v5.2.3)
+- AssetSelector: Tabs ETH/USDC/DAI avec balance et prix
+- AmountInput: Validation temps réel, bouton MAX, calcul USD
+- DepositForm: Orchestrateur complet avec approval flow
+- CollateralManager integration (depositETH + depositERC20)
+- Position preview avec nouveau collateral et max borrowable
+- Auto-refresh dashboard après transaction (refetch Apollo)
+- Test pages interactives (/test-asset-selector, /test-amount-input, /test-deposit-form)
+- Production page /deposit avec guide utilisateur
+- Tests validés: ETH, USDC, DAI deposits sur Sepolia
+
 ---
 
-## 🎯 Prochaine Priorité: Frontend Phase 3 - Dashboard
+## 🎯 Prochaine Priorité: Frontend Phase 5 - Borrow Flow
 
 ### Objectif
-Implémenter le dashboard principal avec données réelles et composants interactifs.
+Implémenter le flux d'emprunt avec validation health factor et gestion des limites.
 
-### Composants à Créer (Phase 3)
+### Composants à Créer (Phase 5)
 
-**1. Dashboard Page (`/dashboard`)**
-- TVLOverviewCard : TVL global + breakdown par asset (ETH/USDC/DAI)
-- UserPositionCard : Position utilisateur (collateral, dette, disponible)
-- HealthFactorDisplay : Gauge visuel + alertes si HF < 1.5
-- QuickActionsCard : Boutons CTA (Deposit, Borrow, Repay)
+**1. Borrow Page (`/borrow`)**
+- BorrowForm: Saisie montant ETH à emprunter
+- HealthFactorPreview: Simulation HF après emprunt
+- AvailableCreditDisplay: Max borrowable en temps réel
+- RiskWarnings: Alertes si HF simulé < 1.5
 
-**2. Hooks Custom**
-- `useUserPosition` : Fetch position depuis subgraph (query GET_USER_POSITION)
-- `useHealthFactor` : Calcul health factor temps réel
-- `useGlobalMetrics` : Déjà existe (GET_GLOBAL_METRICS)
+**2. Validations**
+- Amount ≤ Available to Borrow
+- Simulated HF > 1.0 (minimum threshold)
+- Warning if simulated HF < 1.5
+- Oracle emergency mode check (notInEmergency modifier)
 
-**3. Formules à Implémenter**
-- Health Factor : `(collateralUSD * liquidationThreshold) / borrowed`
-- Max Borrowable : `(collateralUSD * LTV) - currentBorrowed`
-- LTV Ratios : ETH 66%, USDC/DAI 75% (déjà dans lib/contracts/config.ts)
-- Liquidation Thresholds : ETH 83%, USDC/DAI 95%
+**3. Transaction Flow**
+- Call LendingPool.borrow(amount)
+- Wait confirmation
+- Update dashboard (refetch)
+- Redirect to /positions
 
-### Critères de Succès Phase 3
-- [ ] TVL global affiché avec breakdown par asset
-- [ ] Position utilisateur affichée (si existante)
-- [ ] Health factor calculé et affiché avec gauge
-- [ ] Alertes si HF < 1.5
-- [ ] Boutons CTA navigation vers Deposit/Borrow
+### Critères de Succès Phase 5
+- [ ] Borrow form avec validation temps réel
+- [ ] Simulation health factor avant transaction
+- [ ] Vérification emergency mode oracle
+- [ ] Transaction borrow fonctionnelle
+- [ ] Dashboard mis à jour automatiquement
 
 ---
 
@@ -100,18 +121,28 @@ Implémenter le dashboard principal avec données réelles et composants interac
 - ✅ Composants layout réutilisables
 - ✅ Styles organization (Tailwind utility-first)
 
-### Phase 3: Dashboard Principal (En cours) 🚧
-- [ ] TVLOverviewCard avec breakdown par asset
-- [ ] UserPositionCard avec données utilisateur
-- [ ] HealthFactorDisplay avec gauge visuel
-- [ ] QuickActionsCard avec boutons CTA
-- [ ] Hooks custom (useUserPosition, useHealthFactor)
+### Phase 3: Dashboard Principal ✅ (Complété v5.2.0)
+- ✅ TVLOverviewCard avec breakdown par asset
+- ✅ UserPositionCard avec données utilisateur
+- ✅ HealthFactorDisplay avec gauge visuel
+- ✅ QuickActionsCard avec boutons CTA
+- ✅ Hooks custom (useUserPosition, useHealthFactor)
 
-### Phase 4: Formulaires Deposit/Borrow (À venir)
-- [ ] Page dépôt/retrait collateral
-- [ ] Page emprunt ETH avec calcul temps réel
-- [ ] Hooks transactions (useDepositCollateral, useBorrow, useRepay)
-- [ ] Approval flow ERC20
+### Phase 4: Deposit Flow ✅ (Complété v5.2.3)
+- ✅ AssetSelector component (ETH/USDC/DAI)
+- ✅ AmountInput component avec validation
+- ✅ DepositForm avec CollateralManager integration
+- ✅ Approval flow ERC20 complet
+- ✅ Auto-refresh dashboard (Apollo refetch)
+- ✅ Test pages + production /deposit
+- ✅ Tests validés sur Sepolia
+
+### Phase 5: Borrow Flow (Prochaine priorité) 🎯
+- [ ] BorrowForm avec validation health factor
+- [ ] Simulation HF temps réel
+- [ ] Vérification emergency mode oracle
+- [ ] Transaction LendingPool.borrow()
+- [ ] Auto-refresh dashboard
 
 ### Phase 5: Analytics (À venir)
 - [ ] Graphiques TVL historique (DailyMetrics)
@@ -140,43 +171,50 @@ Implémenter le dashboard principal avec données réelles et composants interac
 
 ---
 
-## Fichiers Clés pour Prochaine Session
+## Fichiers Clés pour Prochaine Session (Phase 5 - Borrow Flow)
 
 ### À Consulter
-- `bot/src/services/position_monitor.py` - Logique surveillance positions
-- `bot/src/config.py` - Configuration Graph URL, addresses, etc.
-- `subgraph/schema.graphql` - Entités disponibles pour queries
-- `.env` - Adresses contracts et clés API
+- `frontend/components/forms/DepositForm.tsx` - Pattern à réutiliser pour BorrowForm
+- `frontend/hooks/useUserPosition.ts` - Position data + refetch
+- `frontend/hooks/useHealthFactor.ts` - `simulateHealthFactor()` pour preview
+- `frontend/lib/contracts/abis/LendingPool.json` - Fonction `borrow(amount)`
+- `contracts/LendingPool.sol` - Vérifier modifier `notInEmergency`
 
-### À Créer
-- `bot/src/jobs/health_monitor.py`
-- `bot/src/jobs/liquidation_check.py`
-- `bot/src/jobs/price_sync.py`
-- `bot/src/scheduler.py`
-- `bot/INTEGRATION_TEST_RESULTS.md`
+### À Créer (Phase 5)
+- `frontend/components/forms/BorrowForm.tsx` - Orchestrateur principal
+- `frontend/app/(authenticated)/borrow/page.tsx` - Production page
+- `frontend/app/(authenticated)/test-borrow-form/page.tsx` - Test page (optionnel)
+
+### Pattern Borrow Transaction
+```typescript
+// Dans BorrowForm.tsx
+import LendingPoolABI from "@/lib/contracts/abis/LendingPool.json";
+
+const handleBorrow = async () => {
+  borrow({
+    address: CONTRACTS.LENDING_POOL,
+    abi: LendingPoolABI.abi,
+    functionName: "borrow",
+    args: [parseEther(amount)], // amount en ETH
+  });
+};
+
+// Après succès: refetchUserPosition() + redirect dashboard
+```
 
 ### Queries GraphQL Utiles
 ```graphql
-# Récupérer positions à risque
-query RiskyPositions {
-  positions(where: {healthFactor_lt: "1.0", status: "ACTIVE"}) {
-    id
-    user { id }
+# Position utilisateur pour calculs
+query UserPosition($userId: ID!) {
+  user(id: $userId) {
     totalCollateralUSD
-    borrowed
-    healthFactor
-  }
-}
-
-# Vérifier dernières liquidations
-query RecentLiquidations {
-  liquidations(first: 5, orderBy: timestamp, orderDirection: desc) {
-    id
-    user { id }
-    liquidator
-    debtRepaid
-    collateralSeized
-    timestamp
+    totalBorrowed
+    activePositions
+    collaterals {
+      asset { symbol ltv }
+      amount
+      valueUSD
+    }
   }
 }
 ```
@@ -198,7 +236,7 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
 - OracleAggregator: `0x62f41B1EDc66bC46e05c34AC40B447E5A7ab3EAe`
 
 ### The Graph Endpoint
-- Subgraph v4.11.1-fix-activePositions: https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
+- Subgraph v5.0.0: https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
 
 ---
 
@@ -208,6 +246,19 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
 - ETH comme token principal (pas de token custom)
 - Multi-collateral: ETH, USDC, DAI
 - Oracle fallback Chainlink → Uniswap TWAP
+- **CollateralManager** pour tous les dépôts (ETH + ERC20) - architecture unifiée
+- **LendingPool** pour emprunts et remboursements uniquement
+
+### Frontend Phase 4 (Deposit Flow)
+- Utilisation de **CollateralManager** au lieu de LendingPool.depositCollateral()
+  - `depositETH()` pour ETH (payable)
+  - `depositERC20(asset, amount)` pour USDC/DAI
+- Approval ERC20 vers **COLLATERAL_MANAGER** (pas LENDING_POOL)
+- Auto-refresh dashboard via `refetch()` Apollo après transaction (délai 2s pour subgraph indexing)
+- Pas de vérification emergency mode sur deposits (seulement sur borrow/liquidate)
+- **Positions multiples:** 1 user = 1 position unique avec multiple collaterals agrégés
+  - `activePositions` = 0 ou 1 max (pas de positions séparées par emprunt)
+  - Historique des emprunts via `BorrowEvent[]` dans subgraph
 - Bot Python (pas de bot TypeScript)
 - **Unified Position Model**: Un user = une position globale (MVP v5.2.0)
   - Design choice: Simplicité pour MVP

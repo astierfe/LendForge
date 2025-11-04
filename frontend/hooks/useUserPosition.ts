@@ -79,7 +79,7 @@ export function useUserPosition() {
   const { address, isConnected } = useAccount();
 
   // Query user position (will be null if user doesn't exist in subgraph)
-  const { data, error } = useSuspenseQuery<UserPositionResponse>(
+  const { data, error, refetch } = useSuspenseQuery<UserPositionResponse>(
     GET_USER_POSITION_DETAILED,
     {
       variables: {
@@ -97,6 +97,7 @@ export function useUserPosition() {
     hasDeposits: (user?.collaterals?.length ?? 0) > 0,
     hasActiveBorrow: (user?.activePositions ?? 0) > 0,
     error,
+    refetch, // Expose refetch function
   };
 }
 
