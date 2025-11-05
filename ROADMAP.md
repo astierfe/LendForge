@@ -1,7 +1,7 @@
 # LendForge - Roadmap Développement
 
-**Version actuelle:** v5.2.3
-**Dernière mise à jour:** 4 novembre 2025
+**Version actuelle:** v5.4.0
+**Dernière mise à jour:** 5 novembre 2025
 
 ---
 
@@ -68,39 +68,24 @@
 - Production page /deposit avec guide utilisateur
 - Tests validés: ETH, USDC, DAI deposits sur Sepolia
 
+**Frontend Phase 5A - Borrow Flow** ✅ (v5.3.0)
+- BorrowForm: Amount input avec validation HF temps réel, bouton MAX, transaction flow complet
+- Hooks: useBorrowSimulation (ANO_003 workaround), useEmergencyMode (oracle check)
+- Health Factor preview: Current → Simulated avec color coding (seuils 1.0/1.5/2.0)
+- Interest rate display: Fetch LendingPool.getCurrentBorrowRate() avec fallback 5% hardcoded
+- Emergency mode: Form disabled si oracle en mode urgence (simple disabled, pas de banner v1)
+- Transaction flow: LendingPool.borrow() + auto-refresh dashboard (2s delay pour subgraph)
+- Production page /borrow avec sidebar info (How Borrowing Works, HF Guide, Risk Warning, LTV Ratios)
+- Bug fixes: Dashboard "Available to Borrow" affichait 0.0000 ETH (ANO_003 workaround + USDC decimals 6), hasActiveBorrow robust check (3 fallbacks)
+- Tests validés: USER (200 DAI + 3,050 USDC, 0.99 ETH borrowed) et DEPLOYER (10,100 DAI + 101 USDC + 0.014 ETH)
+
 ---
 
-## 🎯 Prochaine Priorité: Frontend Phase 5A - Borrow Flow
+## 🎯 Prochaine Priorité: Phase 6A - End-to-End Testing
 
-### Objectif
-Implémenter le flux d'emprunt avec validation health factor et gestion des limites.
+**Objectif de la prochaine conversation:** Valider scénarios critiques (liquidation bot, repay flow) pour détecter bugs avant modifications smart contracts.
 
-### Composants à Créer (Phase 5A)
-
-**1. Borrow Page (`/borrow`)**
-- BorrowForm: Saisie montant ETH à emprunter
-- HealthFactorPreview: Simulation HF après emprunt
-- AvailableCreditDisplay: Max borrowable en temps réel
-- RiskWarnings: Alertes si HF simulé < 1.5
-
-**2. Validations**
-- Amount ≤ Available to Borrow
-- Simulated HF > 1.0 (minimum threshold)
-- Warning if simulated HF < 1.5
-- Oracle emergency mode check (notInEmergency modifier)
-
-**3. Transaction Flow**
-- Call LendingPool.borrow(amount)
-- Wait confirmation
-- Update dashboard (refetch)
-- Redirect to /positions
-
-### Critères de Succès Phase 5A
-- [ ] Borrow form avec validation temps réel
-- [ ] Simulation health factor avant transaction
-- [ ] Vérification emergency mode oracle
-- [ ] Transaction borrow fonctionnelle
-- [ ] Dashboard mis à jour automatiquement
+Voir détails complets dans section "Phase 6: Testing & Stabilization" ci-dessous.
 
 ---
 
@@ -114,19 +99,168 @@ Implémenter le flux d'emprunt avec validation health factor et gestion des limi
 
 ### Phase 4: Deposit Flow ✅ (Complété v5.2.3)
 
-### Phase 5A: Borrow Flow (Prochaine priorité) 🎯
-- [ ] BorrowForm avec validation health factor
-- [ ] Simulation HF temps réel
-- [ ] Vérification emergency mode oracle
-- [ ] Transaction LendingPool.borrow()
-- [ ] Auto-refresh dashboard
+### Phase 5A: Borrow Flow ✅ (Complété v5.3.0)
 
-### Phase 5B: Analytics (À venir)
-- [ ] Graphiques TVL historique (DailyMetrics)
-- [ ] Liquidations récentes
-- [ ] Prix assets (Chainlink vs CoinGecko - display only)
+### Phase 5B: Analytics & Metrics ✅ (Complété v5.4.0)
 
-### Phase 6: Oracles Réels Sepolia (Optionnel - 2-3h)
+### Phase 6: Testing & Stabilization 🎯 (Objectif Actuel)
+
+### Phase 6A: End-to-End Testing ⏳ (Priorité CRITIQUE)
+
+**Objectif:** Valider les scénarios critiques du protocole et détecter les bugs avant modifications smart contracts.
+
+**Scénarios à Tester:**
+
+**1. Test Liquidation Bot End-to-End**
+- Créer position avec low health factor (HF < 1.2): deposit minimal collateral + borrow max
+- Trigger liquidation scenario: modifier ETH price via mock oracle pour faire HF < 1.0
+- Lancer bot Python en mode monitoring (APScheduler jobs actifs)
+- Vérifier détection risky position (health_monitor job < 60s)
+- Vérifier exécution liquidation automatique (liquidation_check job)
+- Valider cohérence Frontend après liquidation:
+  - Dashboard user: Position liquidée → Collateral/Borrowed à jour
+  - Analytics LiquidationsHistoryCard: Event affiché avec debt repaid + collateral seized
+  - Subgraph: LiquidationEvent entity créée avec bonnes valeurs (user, liquidator, amounts)
+  - Transaction Etherscan: Vérifier logs et gas used
+
+**2. Test REPAY Flow (Partiel + Total)**
+- Setup: User avec position active (collateral deposited, ETH borrowed)
+- Test REPAY partiel: Rembourser 50% du borrowed amount
+  - Vérifier Health Factor augmente correctement
+  - Vérifier Total Borrowed décrémente dans Dashboard
+  - Vérifier RecentActivityCard affiche transaction REPAY
+- Test REPAY total: Rembourser 100% restant
+  - Vérifier position status → No active borrow (hasActiveBorrow = false)
+  - Vérifier disponibilité withdraw collateral (unlock après full repay)
+  - Vérifier Utilization Rate globale se met à jour dans Analytics
+
+**3. Test Gains Scenario (Price Increase)**
+- Setup: User avec HF = 1.3 (risky mais non-liquidable)
+- Simuler gain: ETH price increases +20% via mock oracle
+- Vérifier HF remonte automatiquement (collateral value ↑)
+- Vérifier Available to Borrow augmente proportionnellement
+- Tester nouveau borrow additionnel avec HF safe (> 2.0)
+
+**Validation Frontend (Checklist):**
+- [ ] Dashboard UserPositionCard: Collateral/Borrowed/HF real-time updates
+- [ ] Analytics TVLChart: TVL increases/decreases reflected
+- [ ] Analytics RecentActivityCard: All transactions (DEPOSIT/BORROW/REPAY/LIQUIDATION) visible
+- [ ] Analytics LiquidationsHistoryCard: Liquidation events avec amounts corrects
+- [ ] Subgraph entities: User, Position, GlobalMetric, DailyMetric, Events cohérents
+- [ ] Bot logs: Detection timing, profitability calculation, gas estimation
+
+**Critères de Succès Phase 6A:**
+- [ ] Bot détecte et liquide positions risquées en < 2 minutes
+- [ ] REPAY flow fonctionne (partiel + total) sans erreurs
+- [ ] Frontend Dashboard + Analytics 100% cohérents après chaque transaction
+- [ ] Aucun nouveau bug critique découvert (ou documenté si trouvé)
+
+---
+
+### Phase 6B: Code Quality & Refactoring ⏳ (Après 6A)
+
+**Objectif:** Éliminer hardcoded values, factoriser calculs, préparer évolutivité (Uniswap, multiple assets).
+
+**Tasks:**
+
+**1. Audit Valeurs Hardcodées**
+- Grep recherche: `1.0`, `18`, `6`, `$1` dans hooks et components
+- Créer `frontend/lib/constants.ts`:
+```typescript
+export const ASSET_CONFIG = {
+  ETH: { decimals: 18, symbol: "ETH", address: "0xeeee...", priceSource: "oracle" },
+  USDC: { decimals: 6, symbol: "USDC", address: "0xc470...", priceSource: "hardcoded", price: 1.0 },
+  DAI: { decimals: 18, symbol: "DAI", address: "0x2fa3...", priceSource: "hardcoded", price: 1.0 }
+} as const;
+```
+- Remplacer tous hardcoded decimals/prices par `ASSET_CONFIG[symbol]`
+
+**2. Factorisation Calculs**
+- Identifier duplications: TVL calculation dans useGlobalMetrics, useDailyMetrics, useHealthFactor
+- Créer `frontend/lib/calculators.ts`:
+```typescript
+export function calculateTVL(ethAmount: number, usdcAmount: number, daiAmount: number, ethPrice: number): number
+export function calculateBorrowedUSD(borrowedEth: number, ethPrice: number): number
+export function calculateUtilization(borrowed: number, tvl: number): number
+export function calculateHealthFactor(collateralUSD: number, borrowedUSD: number, weightedLT: number): number
+```
+- Centraliser toutes les formules avec JSDoc expliquant calcul
+
+**3. Code Review Checklist**
+- [ ] Remplacer hardcoded decimals par ASSET_CONFIG
+- [ ] Remplacer hardcoded prices ($1 stablecoins) par config
+- [ ] Centraliser conversions Wei→ETH→USD
+- [ ] Factoriser calculateTVL/Borrowed/Utilization
+- [ ] Documenter formules dans JSDoc (TVL, HF, LTV, etc.)
+- [ ] Vérifier consistency: même calcul = même résultat partout
+
+**Bénéfices:**
+- Évolutivité: Ajout nouveaux assets (LINK, WBTC) = 1 ligne dans ASSET_CONFIG
+- Maintenabilité: Formule modifiée 1 seul endroit
+- Testabilité: Unit tests sur calculators.ts isolés
+
+---
+
+### Phase 6C: Smart Contracts Fixes 📅 (Préparation, Déploiement si Blindé)
+
+**Objectif:** Corriger ANO_002 (decimals) et ANO_003 (valueUSD per-asset) dans smart contracts. **Déploiement uniquement après validation Phase 6A+6B.**
+
+**Modifications Requises:**
+
+**1. Fix ANO_002: Asset Decimals Event**
+- Fichier: `contracts/CollateralManager.sol`
+- Event actuel: `event AssetAdded(address indexed asset, uint256 liquidationThreshold, bool isActive)`
+- Event modifié: `event AssetAdded(address indexed asset, uint8 decimals, uint256 liquidationThreshold, bool isActive)`
+- Modifier `addAsset()` pour émettre decimals
+- Impact subgraph: Handler `handleAssetAdded()` peut parser decimals correctement
+
+**2. Fix ANO_003: Per-Asset Collateral Value**
+- Fichier: `contracts/CollateralManager.sol`
+- Ajouter fonction:
+```solidity
+function getAssetValueUSD(address user, address asset) external view returns (uint256) {
+    uint256 amount = collateralBalances[user][asset];
+    uint256 price = priceRegistry.getPrice(asset);
+    return (amount * price) / (10 ** IERC20Metadata(asset).decimals());
+}
+```
+- Impact subgraph: Handler peut fetch valueUSD per-asset au lieu de total position
+
+**3. Impact Analysis**
+- Couplage faible: Pas de modification ABI breaking (ajout de fonctions, pas suppression)
+- Paramétrage: Aucun changement config (liquidation thresholds, oracles inchangés)
+- Migration: Positions existantes compatibles (pas de storage layout change)
+
+**Déploiement:**
+- [ ] Valider tests unitaires contracts (npm test)
+- [ ] Déployer sur Sepolia: CollateralManager v1.2
+- [ ] Update frontend .env: NEXT_PUBLIC_COLLATERAL_MANAGER_ADDRESS
+- [ ] Update subgraph subgraph.yaml: CollateralManager address + startBlock
+- [ ] Redeploy subgraph v3.1 avec handlers ANO_002/003 fixes
+- [ ] Supprimer workarounds frontend (ASSET_DECIMALS mapping, ANO_003 calculations)
+
+**Critères Go/No-Go Déploiement:**
+- ✅ Phase 6A tests passed (bot + repay validés)
+- ✅ Phase 6B refactoring done (code maintenable)
+- ✅ Aucun bug critique en cours
+- ✅ Backup addresses contracts v1.1 documentées
+
+---
+
+### Phase 6D: Subgraph Fixes (v3.1) 📅 (Après 6C ou en parallèle)
+
+**Objectif:** Corriger ANO_001, ANO_004, ANO_005 dans subgraph (sans redeployer contracts).
+
+**Tasks:**
+- [ ] Fix ANO_001: activePositions counter → handler user-position.ts
+- [ ] Fix ANO_004: currentTVL USD normalization → global-metrics.ts
+- [ ] Fix ANO_005: Add ethPriceUSD, tvlUSD, borrowedUSD fields → DailyMetric schema + daily-metrics.ts
+- [ ] Deploy subgraph v3.1
+- [ ] Remove frontend workarounds (ethPriceFromGlobal parameter, manual TVL calculation)
+
+---
+
+### Phase 7: Oracles Réels Sepolia (Optionnel - 2-3h)
 - [ ] Rechercher Chainlink feeds non-stale (USDC/DAI)
 - [ ] Vérifier pools Uniswap V3 Sepolia actifs
 - [ ] Déployer providers si disponibles
@@ -147,54 +281,6 @@ Implémenter le flux d'emprunt avec validation health factor et gestion des limi
 - [ ] Portfolio presentation notes
 
 ---
-
-## Fichiers Clés pour Prochaine Session (Phase 5A - Borrow Flow)
-
-### À Consulter
-- `frontend/components/forms/DepositForm.tsx` - Pattern à réutiliser pour BorrowForm
-- `frontend/hooks/useUserPosition.ts` - Position data + refetch
-- `frontend/hooks/useHealthFactor.ts` - `simulateHealthFactor()` pour preview
-- `frontend/lib/contracts/abis/LendingPool.json` - Fonction `borrow(amount)`
-- `contracts/LendingPool.sol` - Vérifier modifier `notInEmergency`
-
-### À Créer (Phase 5)
-- `frontend/components/forms/BorrowForm.tsx` - Orchestrateur principal
-- `frontend/app/(authenticated)/borrow/page.tsx` - Production page
-- `frontend/app/(authenticated)/test-borrow-form/page.tsx` - Test page (optionnel)
-
-### Pattern Borrow Transaction
-```typescript
-// Dans BorrowForm.tsx
-import LendingPoolABI from "@/lib/contracts/abis/LendingPool.json";
-
-const handleBorrow = async () => {
-  borrow({
-    address: CONTRACTS.LENDING_POOL,
-    abi: LendingPoolABI.abi,
-    functionName: "borrow",
-    args: [parseEther(amount)], // amount en ETH
-  });
-};
-
-// Après succès: refetchUserPosition() + redirect dashboard
-```
-
-### Queries GraphQL Utiles
-```graphql
-# Position utilisateur pour calculs
-query UserPosition($userId: ID!) {
-  user(id: $userId) {
-    totalCollateralUSD
-    totalBorrowed
-    activePositions
-    collaterals {
-      asset { symbol ltv }
-      amount
-      valueUSD
-    }
-  }
-}
-```
 
 ---
 
@@ -242,10 +328,19 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
   - Limitation: Pas de positions multiples par user
   - Future upgrade: Multiple Positions planned for v6.0+
 
-### Tests
-- Matchstick pour subgraph (pas de tests manuels)
-- Pytest pour bot (couverture unitaire)
-- Tests end-to-end manuels pour intégration complète
+### Frontend Phase 5A (Borrow Flow)
+- **Stablecoin prices hardcoded to $1:** DAI = USDC = $1 dans frontend (testnet limitation)
+  - Pourquoi: Chainlink feeds USDC/DAI sur Sepolia sont stale/inexistants
+  - Impact: Pas de test de depeg scenarios (ex: USDC $0.90)
+  - Solution future: EVO_001 (Real Price Injection System) pour injecter prix mainnet
+- **ETH price from OracleAggregator:** Fetch getPrice(TOKENS.ETH) pour cohérence Dashboard/Borrow
+- **ANO_003 workaround pattern:** Calcul manuel valueUSD = amount × price dans tous les hooks
+  - Appliqué: useBorrowSimulation.ts, calculateMaxBorrowable() (useHealthFactor.ts)
+  - Raison: Subgraph stocke total position value au lieu de per-asset value
+- **USDC decimals fix:** Utiliser 6 au lieu de 18 dans calculateMaxBorrowable (subgraph bug ANO_002)
+- **Emergency mode simple:** Form disabled si oracle.emergencyMode = true (pas de banner v1)
+- **Interest rate:** Fetch from LendingPool.getCurrentBorrowRate() avec fallback 5% hardcoded + note
+- **hasActiveBorrow robust check:** 3 fallbacks (activePositions > 0 || totalBorrowed > 0 || positions check)
 
 ### Déploiement
 - Sepolia pour testnet
