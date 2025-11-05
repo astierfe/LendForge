@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { TrendingDown, AlertCircle, ArrowRight } from "lucide-react";
 import { useUserPosition, formatters } from "@/hooks/useUserPosition";
 import { calculateMaxBorrowable } from "@/hooks/useHealthFactor";
+import { useReadContract } from "wagmi";
+import { formatUnits } from "viem";
+import { CONTRACTS, TOKENS } from "@/lib/contracts/addresses";
 import Link from "next/link";
 
 /**
@@ -24,8 +27,24 @@ export function UserPositionCard() {
   // Debug: Log to verify data
   console.log('[UserPositionCard] User data:', user?.id, 'hasActiveBorrow:', hasActiveBorrow);
 
-  // Constants
-  const ETH_PRICE = 2500; // Hardcoded ETH price (same as TVLOverviewCard)
+  // Get ETH price from oracle (same as BorrowForm)
+  const { data: ethPrice } = useReadContract({
+    address: CONTRACTS.ORACLE_AGGREGATOR,
+    abi: [
+      {
+        inputs: [{ name: "asset", type: "address" }],
+        name: "getPrice",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function",
+      },
+    ],
+    functionName: "getPrice",
+    args: [TOKENS.ETH],
+  });
+
+  // Parse ETH price (8 decimals - Chainlink format), fallback to 2500 if not available
+  const ETH_PRICE = ethPrice ? parseFloat(formatUnits(ethPrice as bigint, 8)) : 2500;
 
   // If no active borrow, show empty state
   if (!user || !hasActiveBorrow) {
@@ -67,7 +86,8 @@ export function UserPositionCard() {
   const maxBorrowableUSD = calculateMaxBorrowable(
     user.totalCollateralUSD,
     user.totalBorrowed,
-    user.collaterals
+    user.collaterals,
+    ETH_PRICE // Pass ETH price from oracle
   );
   const availableToBorrowUSD = Math.max(0, maxBorrowableUSD - totalBorrowedUSD);
   const availableToBorrowETH = availableToBorrowUSD / ETH_PRICE;

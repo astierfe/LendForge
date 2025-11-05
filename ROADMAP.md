@@ -17,7 +17,7 @@
 - Tests: 59 tests unitaires + intégration PASS
 - Déployé sur Sepolia Testnet
 
-**The Graph Subgraph - v4.11.1-fix-activePositions**
+**The Graph Subgraph - v5.0.0**
 - GlobalMetric: TVL total + TVL par asset (ETH/USDC/DAI)
 - DailyMetric: Métriques quotidiennes complètes
 - Position lifecycle: Status ACTIVE/REPAID/LIQUIDATED
@@ -70,12 +70,12 @@
 
 ---
 
-## 🎯 Prochaine Priorité: Frontend Phase 5 - Borrow Flow
+## 🎯 Prochaine Priorité: Frontend Phase 5A - Borrow Flow
 
 ### Objectif
 Implémenter le flux d'emprunt avec validation health factor et gestion des limites.
 
-### Composants à Créer (Phase 5)
+### Composants à Créer (Phase 5A)
 
 **1. Borrow Page (`/borrow`)**
 - BorrowForm: Saisie montant ETH à emprunter
@@ -95,7 +95,7 @@ Implémenter le flux d'emprunt avec validation health factor et gestion des limi
 - Update dashboard (refetch)
 - Redirect to /positions
 
-### Critères de Succès Phase 5
+### Critères de Succès Phase 5A
 - [ ] Borrow form avec validation temps réel
 - [ ] Simulation health factor avant transaction
 - [ ] Vérification emergency mode oracle
@@ -104,65 +104,42 @@ Implémenter le flux d'emprunt avec validation health factor et gestion des limi
 
 ---
 
-## Reste à Faire (Vue d'ensemble)
+## Fait / Reste à Faire (Vue d'ensemble)
 
 ### Phase 1: Bot Automatisé ✅ (Complété v4.3.0)
-- ✅ Implémenter les 3 jobs cron
-- ✅ Configurer APScheduler
-- ✅ Tester cycle complet end-to-end
-- ✅ Validation: liquidation automatique réussie
 
 ### Phase 2: Frontend Infrastructure ✅ (Complété v5.1.0)
-- ✅ Setup Next.js 15 + React 19 + RainbowKit + wagmi
-- ✅ Apollo Client avec Next.js App Router support
-- ✅ Landing page avec stats réelles (GraphQL query)
-- ✅ Layout authenticated (Sidebar, Header, navigation)
-- ✅ Routes protection
-- ✅ Composants layout réutilisables
-- ✅ Styles organization (Tailwind utility-first)
 
 ### Phase 3: Dashboard Principal ✅ (Complété v5.2.0)
-- ✅ TVLOverviewCard avec breakdown par asset
-- ✅ UserPositionCard avec données utilisateur
-- ✅ HealthFactorDisplay avec gauge visuel
-- ✅ QuickActionsCard avec boutons CTA
-- ✅ Hooks custom (useUserPosition, useHealthFactor)
 
 ### Phase 4: Deposit Flow ✅ (Complété v5.2.3)
-- ✅ AssetSelector component (ETH/USDC/DAI)
-- ✅ AmountInput component avec validation
-- ✅ DepositForm avec CollateralManager integration
-- ✅ Approval flow ERC20 complet
-- ✅ Auto-refresh dashboard (Apollo refetch)
-- ✅ Test pages + production /deposit
-- ✅ Tests validés sur Sepolia
 
-### Phase 5: Borrow Flow (Prochaine priorité) 🎯
+### Phase 5A: Borrow Flow (Prochaine priorité) 🎯
 - [ ] BorrowForm avec validation health factor
 - [ ] Simulation HF temps réel
 - [ ] Vérification emergency mode oracle
 - [ ] Transaction LendingPool.borrow()
 - [ ] Auto-refresh dashboard
 
-### Phase 5: Analytics (À venir)
+### Phase 5B: Analytics (À venir)
 - [ ] Graphiques TVL historique (DailyMetrics)
 - [ ] Liquidations récentes
 - [ ] Prix assets (Chainlink vs CoinGecko - display only)
 
-### Phase 3: Oracles Réels Sepolia (Optionnel - 2-3h)
+### Phase 6: Oracles Réels Sepolia (Optionnel - 2-3h)
 - [ ] Rechercher Chainlink feeds non-stale (USDC/DAI)
 - [ ] Vérifier pools Uniswap V3 Sepolia actifs
 - [ ] Déployer providers si disponibles
 - [ ] Mise à jour PriceRegistry via updatePrimaryProvider()
 - [ ] **Note :** Faible priorité, graphiques CoinGecko suffisants pour portfolio
 
-### Phase 4: Tests Avancés (Optionnel - 2-3 jours)
+### Phase 7: Tests Avancés (Optionnel - 2-3 jours)
 - [ ] Scénario oracle deviation > 10%
 - [ ] Test emergency mode activation
 - [ ] Multiple users simultanés
 - [ ] Stress test liquidations multiples
 
-### Phase 5: Documentation Finale
+### Phase Finale: Documentation Finale
 - [ ] README principal avec quick start
 - [ ] Architecture diagram (contracts, bot, subgraph, frontend)
 - [ ] Deployment guide complet
@@ -171,7 +148,7 @@ Implémenter le flux d'emprunt avec validation health factor et gestion des limi
 
 ---
 
-## Fichiers Clés pour Prochaine Session (Phase 5 - Borrow Flow)
+## Fichiers Clés pour Prochaine Session (Phase 5A - Borrow Flow)
 
 ### À Consulter
 - `frontend/components/forms/DepositForm.tsx` - Pattern à réutiliser pour BorrowForm
@@ -275,12 +252,18 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
 - The Graph Studio (pas de hosted service)
 - FastAPI pour bot (API REST exposée)
 
-### Roadmap Future
+---
 
-**v6.0 - Multiple Positions Support** (Planned)
-- Refactor LendingPool: `mapping(address => mapping(bytes32 => Position))`
-- Refactor Subgraph: `Position.id = user.id + "-" + positionIndex`
-- Allow users to create isolated positions with different risk profiles
-- Enable partial liquidations per position
-- Support advanced strategies (hedging, arbitrage)
-- Estimated effort: 1-2 weeks (contracts + subgraph + frontend)
+## 📋 Known Issues & Planned Evolutions
+
+For detailed information about known bugs, anomalies, and planned enhancements, see:
+
+**📄 [_docs/KNOWN_ISSUES.md](_docs/KNOWN_ISSUES.md)**
+
+**Quick Reference:**
+- **ANO_001-004:** Active anomalies with workarounds (subgraph fields, decimal handling, TVL calculation)
+- **EVO_001:** Real Price Injection System (mainnet price data → Sepolia mocks)
+- **EVO_002:** Multiple Positions Support v6.0 (isolated risk management)
+- **EVO_003:** UniswapV3PriceProvider Deployment (real TWAP fallback)
+
+Each issue has a dedicated specification file in `_docs/issues/` with full technical details, implementation steps, and effort estimates.

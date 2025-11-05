@@ -95,7 +95,13 @@ export function useUserPosition() {
     data: user,
     hasPosition: !!user, // User exists in subgraph
     hasDeposits: (user?.collaterals?.length ?? 0) > 0,
-    hasActiveBorrow: (user?.activePositions ?? 0) > 0,
+    // Robust check for active borrow: use counter first (for compatibility),
+    // then check totalBorrowed (workaround for subgraph counter bug),
+    // finally check active positions (most robust)
+    hasActiveBorrow:
+      (user?.activePositions ?? 0) > 0 || // Original counter check
+      (user && parseInt(user.totalBorrowed) > 0) || // Direct totalBorrowed check
+      (user?.positions?.some(p => p.status === "ACTIVE" && parseInt(p.borrowed) > 0) ?? false), // Position status check
     error,
     refetch, // Expose refetch function
   };

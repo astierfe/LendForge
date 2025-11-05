@@ -144,25 +144,41 @@ export function useHealthFactor(): HealthFactorData | null {
  *
  * Formula: (totalCollateralUSD * weightedLTV) - currentBorrowedUSD
  *
- * @param totalCollateralUSD - Total collateral in USD (8 decimals as string)
- * @param currentBorrowed - Current borrowed amount in ETH (18 decimals as string)
+ * @param totalCollateralUSD - Total collateral in USD (8 decimals as string) - NOT USED (buggy subgraph data)
+ * @param currentBorrowed - Current borrowed amount in ETH (18 decimals as string) - NOT USED (calculated by caller)
  * @param collaterals - User collaterals for weighted LTV
+ * @param ethPriceUSD - ETH price in USD (for ETH collateral calculation)
  * @returns Maximum borrowable in USD (number)
  */
 export function calculateMaxBorrowable(
   totalCollateralUSD: string,
   currentBorrowed: string,
-  collaterals: UserCollateral[]
+  collaterals: UserCollateral[],
+  ethPriceUSD: number = 2500 // Default to 2500 for backward compatibility
 ): number {
   if (!collaterals.length) return 0;
 
   // Calculate weighted LTV based on collateral USD values
-  // This is the proper weighted average calculation
+  // NOTE: col.valueUSD from subgraph is BUGGY (ANO_003: contains total position value, not individual collateral)
+  // Workaround: Calculate valueUSD ourselves using amount * price
   let totalWeightedLTV = 0;
 
   for (const col of collaterals) {
-    // Parse collateral value (8 decimals for USD)
-    const colValueUSD = parseFloat(col.valueUSD) / 1e8;
+    // Parse amount based on decimals - IMPORTANT: Use correct decimals mapping
+    // Subgraph stores wrong decimals (18 for all), but USDC actually uses 6
+    // Import formatters from useUserPosition to handle this correctly
+    const actualDecimals = col.asset.symbol === "USDC" ? 6 : col.asset.decimals;
+    const amount = parseFloat(col.amount) / Math.pow(10, actualDecimals);
+
+    // Get price for this asset (use ETH price for ETH, $1 for stablecoins)
+    let assetPriceUSD = 1; // Default for stablecoins (USDC, DAI)
+    if (col.asset.symbol === "ETH") {
+      assetPriceUSD = ethPriceUSD;
+    }
+
+    // Calculate correct valueUSD
+    const colValueUSD = amount * assetPriceUSD;
+
     const colLTV = col.asset.ltv / 100; // Convert percentage to decimal
 
     // Weight the LTV by the collateral's USD value

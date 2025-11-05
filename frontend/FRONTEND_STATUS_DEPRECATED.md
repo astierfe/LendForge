@@ -1,4 +1,4 @@
-# LendForge Frontend - Status
+# LendForge Frontend - DEPRECATED
 
 **Date:** January 31, 2025
 **Version:** v5.3.0
