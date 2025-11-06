@@ -47,20 +47,18 @@ export function TVLOverviewCard() {
   // Calculate ETH price hardcoded at $2500 for now
   const ETH_PRICE = 2500;
 
-  // Build assets array from user's collaterals
-  const assets = user.collaterals.map((collateral) => {
-    const symbol = collateral.asset.symbol;
+  // Build assets array - always show all 3 assets (ETH, USDC, DAI)
+  const allAssets = ["ETH", "USDC", "DAI"];
+  const assets = allAssets.map((symbol) => {
+    // Find collateral for this asset (if exists)
+    const collateral = user.collaterals.find(c => c.asset.symbol === symbol);
 
-    // Parse amount with correct decimals (using formatters which handle the ASSET_DECIMALS workaround)
-    const amount = formatters.tokenToNumber(
-      collateral.amount,
-      collateral.asset.decimals,
-      symbol
-    );
+    // Parse amount (0 if not deposited)
+    const amount = collateral
+      ? formatters.tokenToNumber(collateral.amount, collateral.asset.decimals, symbol)
+      : 0;
 
     // Calculate USD value
-    // Note: collateral.valueUSD is incorrect (shows total, not per-asset - see KNOWN_ISSUES.md #3)
-    // So we calculate manually
     let valueUSD = 0;
     if (symbol === "ETH") {
       valueUSD = amount * ETH_PRICE;

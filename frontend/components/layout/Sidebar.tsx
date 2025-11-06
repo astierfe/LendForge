@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, PlusCircle, TrendingDown, Wallet, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, TrendingDown, ArrowUpFromLine, ArrowDownFromLine, Wallet, BarChart3 } from 'lucide-react';
 
 const navItems = [
   {
@@ -20,6 +20,16 @@ const navItems = [
     title: 'Borrow',
     href: '/borrow',
     icon: TrendingDown,
+  },
+  {
+    title: 'Repay',
+    href: '/repay',
+    icon: ArrowUpFromLine,
+  },
+  {
+    title: 'Withdraw',
+    href: '/withdraw',
+    icon: ArrowDownFromLine,
   },
   {
     title: 'Positions',

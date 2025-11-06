@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowDownToLine, ArrowUpFromLine, Banknote, Zap } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Banknote, Zap, ArrowDownFromLine as WithdrawIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useUserPosition } from "@/hooks/useUserPosition";
 import { useHealthFactor } from "@/hooks/useHealthFactor";
@@ -14,11 +14,13 @@ import { useHealthFactor } from "@/hooks/useHealthFactor";
  * - Deposit: Add collateral (always available)
  * - Borrow: Borrow ETH (disabled if no collateral or HF too low)
  * - Repay: Repay debt (disabled if no active borrow)
+ * - Withdraw: Withdraw collateral (disabled if no deposits)
  *
  * Buttons are contextually enabled/disabled based on user state:
  * - Deposit: Always available
  * - Borrow: Requires collateral AND health factor >= 1.5
  * - Repay: Requires active borrow position
+ * - Withdraw: Requires deposited collateral
  *
  * Data source: useUserPosition + useHealthFactor hooks
  */
@@ -31,6 +33,7 @@ export function QuickActionsCard() {
   const canDeposit = true; // Always can deposit
   const canBorrow = hasDeposits && (!healthFactor || healthFactor.canBorrow); // Has collateral AND (no HF yet OR HF allows borrowing)
   const canRepay = hasActiveBorrow; // Has active debt to repay
+  const canWithdraw = hasDeposits; // Has deposited collateral
 
   // Action handlers
   const handleDeposit = () => {
@@ -44,7 +47,12 @@ export function QuickActionsCard() {
 
   const handleRepay = () => {
     if (!canRepay) return;
-    router.push('/positions'); // Repay from positions page
+    router.push('/repay'); // Updated: direct to /repay page
+  };
+
+  const handleWithdraw = () => {
+    if (!canWithdraw) return;
+    router.push('/withdraw');
   };
 
   // Get action messages based on state
@@ -59,6 +67,11 @@ export function QuickActionsCard() {
     return "Repay your debt";
   };
 
+  const getWithdrawMessage = () => {
+    if (!hasDeposits) return "No collateral deposited";
+    return "Withdraw your collateral";
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -69,7 +82,7 @@ export function QuickActionsCard() {
         <CardDescription>Common operations</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Deposit Button */}
           <div className="space-y-2">
             <Button
@@ -117,6 +130,23 @@ export function QuickActionsCard() {
             </Button>
             <p className="text-xs text-muted-foreground text-center">
               {getRepayMessage()}
+            </p>
+          </div>
+
+          {/* Withdraw Button */}
+          <div className="space-y-2">
+            <Button
+              onClick={handleWithdraw}
+              className="w-full"
+              size="lg"
+              variant="default"
+              disabled={!canWithdraw}
+            >
+              <WithdrawIcon className="w-4 h-4 mr-2" />
+              Withdraw
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              {getWithdrawMessage()}
             </p>
           </div>
         </div>
