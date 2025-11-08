@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { GET_GLOBAL_METRICS } from '@/lib/graphql/queries/metrics';
 import { DollarSign, Users, TrendingUp } from 'lucide-react';
+import { useOraclePrices } from '@/hooks/useOraclePrices';
+import { calculateGlobalTVL } from '@/lib/utils/tvl';
 
 interface GlobalMetric {
   id: string;
@@ -37,6 +39,9 @@ export default function LandingPage() {
   const { data } = useSuspenseQuery<GlobalMetricsData>(GET_GLOBAL_METRICS);
   const loading = false; // useSuspenseQuery handles loading automatically
 
+  // Get real-time oracle prices for TVL calculation
+  const oracleData = useOraclePrices();
+
   // Redirect to dashboard if wallet is connected
   useEffect(() => {
     if (isConnected) {
@@ -46,6 +51,16 @@ export default function LandingPage() {
 
   const globalMetrics = data?.globalMetrics?.[0];
   const activePositionsCount = data?.activeUsers?.length || 0;
+
+  // Calculate TVL correctly using individual asset totals (workaround for ANO_004)
+  const totalTVL = globalMetrics
+    ? calculateGlobalTVL(
+        globalMetrics.totalETHDeposited,
+        globalMetrics.totalUSDCDeposited,
+        globalMetrics.totalDAIDeposited,
+        oracleData.prices.ETH.oraclePrice || 3450 // Use real-time oracle price with fallback
+      )
+    : 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -136,7 +151,7 @@ export default function LandingPage() {
                   <Skeleton className="h-8 w-32" />
                 ) : (
                   <p className="text-3xl font-bold">
-                    ${globalMetrics?.currentTVL ? (parseFloat(globalMetrics.currentTVL) / 1e8).toFixed(2) : '0'}
+                    ${totalTVL.toFixed(2)}
                   </p>
                 )}
               </CardContent>

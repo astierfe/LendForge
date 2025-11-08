@@ -2,10 +2,10 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, TrendingUp } from "lucide-react";
-import { useUserPosition, formatters } from "@/hooks/useUserPosition";
 import { useOraclePrices } from "@/hooks/useOraclePrices";
 import { useCollateralAmounts } from "@/hooks/useCollateralAmounts";
 import { TOKENS } from "@/lib/contracts/addresses";
+import { calculateCollateralTVL, type AssetConfig } from "@/lib/utils/tvl";
 
 /**
  * TVLOverviewCard - Displays user's collateral with asset breakdown
@@ -18,8 +18,7 @@ import { TOKENS } from "@/lib/contracts/addresses";
  * Data source: useUserPosition hook (user-specific data from subgraph)
  */
 export function TVLOverviewCard() {
-  const { data: user, hasDeposits } = useUserPosition();
-  const { prices, isLoading: isPricesLoading } = useOraclePrices();
+  const { prices } = useOraclePrices();
 
   // Read collateral amounts on-chain (real-time)
   const { collaterals: onChainCollaterals, isLoading: collateralsLoading } = useCollateralAmounts();
@@ -55,11 +54,14 @@ export function TVLOverviewCard() {
   const DAI_PRICE = prices.DAI.oraclePrice || 1.0;
 
   // Map on-chain collateral addresses to symbols and decimals
-  const assetMap: Record<string, { symbol: string; decimals: number; price: number; color: string }> = {
+  const assetMap: Record<string, AssetConfig & { color: string }> = {
     [TOKENS.ETH.toLowerCase()]: { symbol: "ETH", decimals: 18, price: ETH_PRICE, color: "bg-blue-500" },
     [TOKENS.USDC.toLowerCase()]: { symbol: "USDC", decimals: 6, price: USDC_PRICE, color: "bg-green-500" },
     [TOKENS.DAI.toLowerCase()]: { symbol: "DAI", decimals: 18, price: DAI_PRICE, color: "bg-yellow-500" },
   };
+
+  // Calculate total collateral in USD using shared utility (workaround for ANO_004)
+  const totalCollateralUSD = calculateCollateralTVL(onChainCollaterals, assetMap);
 
   // Convert on-chain collaterals to display format with real-time USD values
   const assetsWithValues = onChainCollaterals.map((col) => {
@@ -79,9 +81,6 @@ export function TVLOverviewCard() {
       color: assetInfo.color,
     };
   }).filter((a) => a !== null);
-
-  // Calculate total collateral in USD (real-time)
-  const totalCollateralUSD = assetsWithValues.reduce((sum, asset) => sum + (asset?.valueUSD || 0), 0);
 
   // Always show all 3 assets (ETH, USDC, DAI) even if balance is 0
   const allAssets = ["ETH", "USDC", "DAI"];

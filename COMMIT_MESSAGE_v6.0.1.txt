@@ -99,7 +99,3 @@ fix(phase-6a): Fix critical bugs + implement real-time frontend data
 4. Full end-to-end liquidation testing without workarounds
 
 ---
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>

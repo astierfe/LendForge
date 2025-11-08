@@ -21,52 +21,6 @@ export default function DashboardPage() {
           <UserPositionCard />
           <HealthFactorDisplay />
           <QuickActionsCard />
-
-          {/* Debug Links */}
-          <div className="border-t pt-4 flex gap-2">
-            <Link href="/test-hooks">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FlaskConical className="w-4 h-4" />
-                Test Hooks
-              </Button>
-            </Link>
-            <Link href="/test-quick-actions">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FlaskConical className="w-4 h-4" />
-                Test Quick Actions
-              </Button>
-            </Link>
-            <Link href="/test-user-position-card">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FlaskConical className="w-4 h-4" />
-                Test User Position Card
-              </Button>
-            </Link>
-            <Link href="/test-health-factor">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FlaskConical className="w-4 h-4" />
-                  factor Test Health
-              </Button>
-            </Link>               
-            <Link href="/test-asset-selector">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FlaskConical className="w-4 h-4" />
-                  test-asset-selector
-              </Button>                           
-            </Link>    
-            <Link href="/test-amount-input">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FlaskConical className="w-4 h-4" />
-                  test-amount-input
-              </Button>                           
-            </Link>          
-            <Link href="/test-deposit-form">
-              <Button variant="outline" size="sm" className="gap-2">
-                <FlaskConical className="w-4 h-4" />
-                  test-deposit-form
-              </Button>                           
-            </Link>                       
-          </div>
         </div>
       </PageContainer>
     </>

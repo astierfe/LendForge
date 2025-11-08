@@ -18,14 +18,14 @@ import { useUserPosition } from "@/hooks/useUserPosition";
  * Data source: useHealthFactor hook
  */
 export function HealthFactorDisplay() {
-  const { hasActiveBorrow } = useUserPosition();
   const healthFactor = useHealthFactor();
 
   // Debug log
-  console.log('[HealthFactorDisplay] hasActiveBorrow:', hasActiveBorrow, 'healthFactor:', healthFactor);
+  console.log('[HealthFactorDisplay] healthFactor:', healthFactor);
 
-  // If no active borrow, show empty state
-  if (!hasActiveBorrow || !healthFactor) {
+  // If no health factor data, show empty state
+  // useHealthFactor already returns null when there's no debt (on-chain check)
+  if (!healthFactor) {
     return (
       <Card>
         <CardHeader>
