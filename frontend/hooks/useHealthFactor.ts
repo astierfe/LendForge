@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
+import { useReadContract, useAccount } from "wagmi";
 import { HEALTH_FACTOR, LIQUIDATION_THRESHOLDS } from "@/lib/contracts/config";
 import { useUserPosition, type UserCollateral } from "./useUserPosition";
+import LendingPoolABI from "@/lib/contracts/abis/LendingPool.json";
+
+const LENDING_POOL_ADDRESS = process.env.NEXT_PUBLIC_LENDING_POOL_ADDRESS as `0x${string}`;
+const REFRESH_INTERVAL = 5000; // 5 seconds - same as OraclePricesCard
 
 /**
  * Health Factor risk levels
@@ -54,6 +59,9 @@ function calculateWeightedLiquidationThreshold(
 /**
  * Custom hook to calculate and monitor user's health factor
  *
+ * NOW READS ON-CHAIN for real-time updates (like OraclePricesCard)
+ * No longer depends on subgraph transactions
+ *
  * Health Factor Formula:
  * HF = (totalCollateralUSD * liquidationThreshold) / totalBorrowed
  *
@@ -77,26 +85,56 @@ function calculateWeightedLiquidationThreshold(
  * @returns Health factor data with risk level and display helpers
  */
 export function useHealthFactor(): HealthFactorData | null {
+  const { address } = useAccount();
   const { data: user, hasActiveBorrow } = useUserPosition();
 
+  // Read health factor directly from contract (real-time on-chain)
+  const {
+    data: healthFactorRaw,
+    isLoading,
+    error,
+    refetch,
+  } = useReadContract({
+    address: LENDING_POOL_ADDRESS,
+    abi: LendingPoolABI.abi,
+    functionName: "getHealthFactor",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: REFRESH_INTERVAL,
+    },
+  });
+
+  // Auto-refresh for real-time updates
+  useEffect(() => {
+    if (!address) return;
+
+    const interval = setInterval(() => {
+      refetch();
+    }, REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [address, refetch]);
+
   const healthFactorData = useMemo(() => {
-    // No user or no active borrow = no health factor to display
-    if (!user || !hasActiveBorrow || user.activePositions === 0) {
+    // No address or loading = no health factor yet
+    if (!address || isLoading || healthFactorRaw === undefined) {
       return null;
     }
 
-    // Get health factor from active position (contract-calculated)
-    // If multiple positions, use the first one (most common case)
-    const activePosition = user.positions.find((p) => p.status === "ACTIVE");
+    // Parse health factor from contract
+    // Contract returns:
+    // - 2 decimal precision (144 = 1.44)
+    // - 0xfff...fff = no debt (infinite health factor)
+    const NO_DEBT_VALUE = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
-    if (!activePosition) {
+    // No debt = no health factor to display
+    if (healthFactorRaw === NO_DEBT_VALUE) {
       return null;
     }
 
-    // Parse health factor from subgraph
-    // Note: Subgraph already converts it from contract format (multiplied by 100)
-    // to decimal format (e.g., 15.12). See lending-pool.ts:134
-    const hf = parseFloat(activePosition.healthFactor);
+    // Convert from 2 decimal precision to float (144 -> 1.44)
+    const hf = Number(healthFactorRaw) / 100;
 
     // Determine risk level
     let level: HealthFactorLevel;
@@ -134,7 +172,7 @@ export function useHealthFactor(): HealthFactorData | null {
       label,
       canBorrow: hf >= HEALTH_FACTOR.WARNING, // Only allow borrowing if HF >= 1.5
     };
-  }, [user, hasActiveBorrow]);
+  }, [address, isLoading, healthFactorRaw]);
 
   return healthFactorData;
 }

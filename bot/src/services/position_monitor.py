@@ -47,9 +47,12 @@ class PositionMonitor:
                 logger.debug(f"Analyzing position {user_addr[:10]}...")
 
                 # Get multi-collateral data from contracts
-                collateral_usd, borrowed, last_update = self.web3_client.get_position_onchain(user_addr)
+                collateral_usd, borrowed_wei, last_update = self.web3_client.get_position_onchain(user_addr)
                 hf_raw = self.web3_client.get_health_factor(user_addr)
                 hf_onchain = Decimal(hf_raw) / Decimal(100) if hf_raw < 999999 else Decimal("999.99")
+
+                # Convert borrowed from Wei ETH to USD (8 decimals)
+                borrowed_usd = self.web3_client.convert_borrowed_to_usd(borrowed_wei)
 
                 # Get detailed collateral breakdown
                 user_collaterals = self.web3_client.get_user_collaterals(user_addr)
@@ -57,7 +60,7 @@ class PositionMonitor:
                 # Update position with real on-chain data
                 position.health_factor = hf_onchain
                 position.collateral_amount = collateral_usd
-                position.borrowed = borrowed
+                position.borrowed = borrowed_usd  # Now in USD (8 decimals), not Wei ETH
 
                 # Enhanced logging with multi-collateral details
                 collateral_summary = ", ".join([
@@ -69,18 +72,18 @@ class PositionMonitor:
                     f"Position {user_addr[:10]}... | "
                     f"HF={hf_onchain:.2f} | "
                     f"Collateral=${collateral_usd / 10**Config.USD_DECIMALS:.2f} | "
-                    f"Borrowed=${borrowed / 10**Config.USD_DECIMALS:.2f} | "
+                    f"Borrowed=${borrowed_usd / 10**Config.USD_DECIMALS:.2f} | "
                     f"Assets=[{collateral_summary}]"
                 )
 
                 # Check if liquidatable
-                if hf_onchain < Decimal("1.0") and borrowed > 0:
+                if hf_onchain < Decimal("1.0") and borrowed_usd > 0:
                     liquidatable.append(position)
                     logger.warning(
                         f"🚨 [LIQUIDATABLE] Position {user_addr[:10]}... | "
                         f"HF={hf_onchain:.2f} | "
                         f"Value=${collateral_usd / 10**Config.USD_DECIMALS:.2f} | "
-                        f"Debt=${borrowed / 10**Config.USD_DECIMALS:.2f} | "
+                        f"Debt=${borrowed_usd / 10**Config.USD_DECIMALS:.2f} | "
                         f"Assets={len(user_collaterals)}"
                     )
 
@@ -176,11 +179,12 @@ class PositionMonitor:
             collaterals = self.web3_client.get_user_collaterals(user_address)
             collateral_usd = self.web3_client.get_collateral_value_usd(user_address)
             max_borrow = self.web3_client.get_max_borrow_value(user_address)
-            _, borrowed, _ = self.web3_client.get_position_onchain(user_address)
+            _, borrowed_wei, _ = self.web3_client.get_position_onchain(user_address)
+            borrowed_usd = self.web3_client.convert_borrowed_to_usd(borrowed_wei)
             hf = self.web3_client.get_health_factor(user_address)
 
             # Calculate risk metrics
-            utilization = (borrowed / max_borrow * 100) if max_borrow > 0 else 0
+            utilization = (borrowed_usd / max_borrow * 100) if max_borrow > 0 else 0
             liquidation_distance = (Decimal(hf) / 100 - 1) * 100  # % above liquidation
 
             # Asset breakdown
@@ -198,13 +202,13 @@ class PositionMonitor:
                 'user_address': user_address,
                 'health_factor': float(Decimal(hf) / 100),
                 'collateral_usd': collateral_usd / 10**Config.USD_DECIMALS,
-                'borrowed_usd': borrowed / 10**Config.USD_DECIMALS,
+                'borrowed_usd': borrowed_usd / 10**Config.USD_DECIMALS,
                 'max_borrow_usd': max_borrow / 10**Config.USD_DECIMALS,
                 'utilization_percent': utilization,
                 'liquidation_distance_percent': float(liquidation_distance),
                 'asset_count': len(collaterals),
                 'asset_breakdown': asset_breakdown,
-                'is_liquidatable': hf < 100 and borrowed > 0,  # HF < 1.0 (contract returns 100 = 1.0)
+                'is_liquidatable': hf < 100 and borrowed_usd > 0,  # HF < 1.0 (contract returns 100 = 1.0)
                 'risk_level': 'HIGH' if hf < 120 else 'MEDIUM' if hf < 150 else 'LOW'
             }
 

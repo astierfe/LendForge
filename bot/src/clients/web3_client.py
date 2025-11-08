@@ -130,6 +130,48 @@ class Web3Client:
             logger.error(f"Failed to get position on-chain: {e}")
             return 0, 0, 0
     
+    def convert_borrowed_to_usd(self, borrowed_wei: int) -> int:
+        """
+        Convert borrowed amount from Wei ETH to USD (8 decimals)
+
+        Args:
+            borrowed_wei: Borrowed amount in Wei (18 decimals)
+
+        Returns:
+            Borrowed amount in USD with 8 decimals (Chainlink standard)
+
+        Example:
+            borrowed_wei = 112400000000000000  # 0.1124 ETH
+            eth_price = 326000000000           # $3260 (8 decimals)
+            result = 36662400000               # $366.624 (8 decimals)
+        """
+        try:
+            # Get ETH price from oracle (returns 8 decimals USD)
+            eth_price = self.get_asset_price(Config.ETH_ADDRESS)
+
+            if eth_price == 0:
+                logger.error("ETH price is 0, cannot convert borrowed amount")
+                return 0
+
+            # Convert: (borrowed_wei * eth_price) / 1e18
+            # borrowed_wei: 18 decimals
+            # eth_price: 8 decimals
+            # Result: (18 + 8 - 18) = 8 decimals (USD)
+            borrowed_usd = (borrowed_wei * eth_price) // (10 ** 18)
+
+            logger.debug(
+                f"Converted borrowed | Wei={borrowed_wei} | "
+                f"ETH={borrowed_wei / 10**18:.4f} | "
+                f"Price=${eth_price / 10**8:.2f} | "
+                f"USD=${borrowed_usd / 10**8:.2f}"
+            )
+
+            return borrowed_usd
+
+        except Exception as e:
+            logger.error(f"Failed to convert borrowed to USD: {e}")
+            return 0
+
     def get_health_factor(self, user_address: str) -> int:
         try:
             hf = self.lending_pool.functions.getHealthFactor(

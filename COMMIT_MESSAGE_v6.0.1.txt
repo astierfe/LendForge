@@ -1,0 +1,105 @@
+fix(phase-6a): Fix critical bugs + implement real-time frontend data
+
+## 🐛 Bug Fixes
+
+### ANO_013: Bot Borrowed Amount Conversion (Critical)
+- **Problem:** Bot displayed borrowed amount as $1.124 billion instead of $366
+- **Root Cause:** Treated borrowed Wei ETH (18 decimals) as USD (8 decimals)
+- **Fix:** Added `convert_borrowed_to_usd()` method in `web3_client.py`
+- **Files:** `bot/src/clients/web3_client.py`, `position_monitor.py`, `profit_calculator.py`, `liquidation_check.py`
+- **Impact:** Bot now correctly calculates liquidation profitability and debt amounts
+
+### ANO_008: Liquidation Missing Collateral Transfer (Critical)
+- **Problem:** `LendingPool.liquidate()` accepts payment but never transfers seized collateral to liquidator
+- **Security Impact:** Liquidators lose 100% of funds, protocol accumulates bad debt
+- **Temporary Fix:** Manual script `transfer_liquidated_collateral.sh` (testing only)
+- **Files:** `scripts/transfer_liquidated_collateral.sh`, `bot/src/services/liquidator.py` (warning message)
+- **Documentation:** `_docs/issues/ANO_008_liquidation-missing-collateral-transfer.md`
+- **Status:** Contract fix required for production (add `CollateralManager.seizeCollateral()`)
+
+### Frontend LTV Configuration
+- **Fix:** Corrected USDC/DAI LTV ratios from 75% to 90% in `frontend/lib/contracts/config.ts`
+- **Impact:** Aligns frontend with contract configuration (90% per CollateralManager)
+
+## ✨ Features
+
+### Real-Time Frontend Data (No Subgraph Dependency)
+- **Problem:** Frontend showed stale values from subgraph, updated only after transactions
+- **Solution:** Implemented on-chain reads with 5s auto-refresh (like `OraclePricesCard`)
+
+**New Hooks:**
+- `useHealthFactor()` - Reads `LendingPool.getHealthFactor()` on-chain (replaces subgraph)
+- `useBorrowedAmount()` - Reads `LendingPool.getBorrowedAmount()` on-chain
+- `useCollateralAmounts()` - Reads `CollateralManager.getUserCollaterals()` on-chain
+
+**Updated Components:**
+- `HealthFactorDisplay.tsx` - Real-time HF updates every 5s
+- `UserPositionCard.tsx` - Real-time borrowed amount (no more stale debt values)
+- `TVLOverviewCard.tsx` - Real-time collateral + USD values using live oracle prices
+
+**Benefits:**
+- Oracle price changes immediately reflected in frontend
+- No waiting for transactions to see updated values
+- Wagmi cache provides optimal performance
+- Consistent with `OraclePricesCard` pattern
+
+## 🧪 Testing
+
+### Successful Liquidation Test
+- Created liquidatable position (600 USDC collateral, 0.1 ETH debt, HF=0.86)
+- Bot correctly identified position and calculated $15 profit
+- Executed liquidation transaction: `0xd2d3d53e319ab04ea054edd09a7fd687499b7979d6435750f6f9b2511c009a71`
+- Applied rustine to transfer 600 USDC collateral to liquidator
+- **Result:** Liquidation system functional with manual workaround
+
+### Oracle Deviation Handling
+- Fixed MockETH price to match Chainlink ($3450) to eliminate 5.83% deviation
+- Oracle now correctly uses primary provider (Mock) instead of fallback
+- Verified deviation threshold logic (5% = switch to fallback, 10% = emergency mode)
+
+## 📚 Documentation
+
+- Added ANO_008 to `_docs/KNOWN_ISSUES.md` (Critical severity)
+- Created detailed spec: `_docs/issues/ANO_008_liquidation-missing-collateral-transfer.md`
+- Documented rustine workflow in ANO_008 spec
+- Updated file structure index with ANO_008 entry
+
+## 🔧 Technical Details
+
+**Bot Changes:**
+- Wei → USD conversion now uses real-time oracle prices
+- Multi-asset profit calculation handles mixed decimals correctly
+- Enhanced logging shows asset breakdown and USD values
+
+**Frontend Architecture:**
+- Hybrid approach: Real-time values (on-chain) + historical data (TheGraph)
+- On-chain for: HF, borrowed amount, collateral, oracle prices
+- TheGraph for: liquidation history, analytics, leaderboards, metrics
+
+**Oracle Configuration:**
+- MockETH: $3450 (aligned with Chainlink)
+- USDC: $0.60 (test price for liquidation scenarios)
+- Deviation threshold: 5% (triggers fallback), 10% (emergency mode)
+
+## ⚠️ Known Limitations
+
+1. **ANO_008 Rustine:** Requires manual script execution after each liquidation
+   - Only works for testing (needs USER private key)
+   - Production requires contract fix (add `seizeCollateral()`)
+
+2. **Frontend Real-Time Data:** Some components still use subgraph for historical context
+   - Dashboard cards: ✅ Real-time on-chain
+   - Analytics charts: TheGraph (historical data)
+
+## 🚀 Next Steps (Phase 7)
+
+1. Fix ANO_008 permanently: Implement `CollateralManager.seizeCollateral()`
+2. Redeploy contracts with automatic collateral transfer
+3. Remove manual rustine script
+4. Full end-to-end liquidation testing without workarounds
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>

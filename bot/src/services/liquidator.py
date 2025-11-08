@@ -83,14 +83,28 @@ class Liquidator:
         
         if tx_hash:
             log_liquidation(
-                position.user_address, 
-                float(expected_profit), 
+                position.user_address,
+                float(expected_profit),
                 tx_hash
             )
             self.metrics.record_success(
                 float(expected_profit),
                 float(position.gas_cost_usd)
             )
+
+            # RUSTINE WARNING: Collateral not automatically transferred
+            logger.warning("=" * 80)
+            logger.warning("⚠️  RUSTINE REQUIRED: Liquidation successful but collateral NOT transferred!")
+            logger.warning(f"   User: {position.user_address}")
+            logger.warning(f"   TX: {tx_hash}")
+            logger.warning("")
+            logger.warning("   MANUAL ACTION REQUIRED:")
+            logger.warning("   Run: bash scripts/transfer_liquidated_collateral.sh")
+            logger.warning("")
+            logger.warning("   This will transfer the collateral from USER to LIQUIDATOR")
+            logger.warning("   TODO: Fix LendingPool.liquidate() to auto-transfer collateral")
+            logger.warning("=" * 80)
+
             return True
         else:
             log_liquidation_failed(position.user_address, "Transaction failed")

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { TrendingDown, AlertCircle, ArrowRight } from "lucide-react";
 import { useUserPosition, formatters } from "@/hooks/useUserPosition";
 import { calculateMaxBorrowable } from "@/hooks/useHealthFactor";
+import { useBorrowedAmount } from "@/hooks/useBorrowedAmount";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import { CONTRACTS, TOKENS } from "@/lib/contracts/addresses";
@@ -24,8 +25,11 @@ import Link from "next/link";
 export function UserPositionCard() {
   const { data: user, hasActiveBorrow } = useUserPosition();
 
+  // Read borrowed amount on-chain (real-time)
+  const { borrowedETH: totalBorrowedETH, isLoading: borrowLoading } = useBorrowedAmount();
+
   // Debug: Log to verify data
-  console.log('[UserPositionCard] User data:', user?.id, 'hasActiveBorrow:', hasActiveBorrow);
+  console.log('[UserPositionCard] User data:', user?.id, 'hasActiveBorrow:', hasActiveBorrow, 'borrowedETH:', totalBorrowedETH);
 
   // Get ETH price from oracle (same as BorrowForm)
   const { data: ethPrice } = useReadContract({
@@ -48,7 +52,9 @@ export function UserPositionCard() {
   const ETH_PRICE = ethPrice ? parseFloat(formatUnits(ethPrice as bigint, 8)) : 1600;
 
   // If no active borrow, show empty state
-  if (!user || !hasActiveBorrow) {
+  // Check both subgraph and on-chain data
+  const hasDebt = totalBorrowedETH > 0;
+  if (!user || (!hasActiveBorrow && !hasDebt)) {
     return (
       <Card>
         <CardHeader>
@@ -76,8 +82,8 @@ export function UserPositionCard() {
     );
   }
 
-  // Parse total borrowed (ETH with 18 decimals)
-  const totalBorrowedETH = formatters.weiToEth(user.totalBorrowed);
+  // Use on-chain borrowed amount (real-time) instead of subgraph
+  // totalBorrowedETH comes from useBorrowedAmount() hook above
   const totalBorrowedUSD = totalBorrowedETH * ETH_PRICE;
 
   // Parse total collateral (USD with 8 decimals)

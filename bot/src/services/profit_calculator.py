@@ -25,11 +25,14 @@ class ProfitCalculator:
         # Get comprehensive position data
         collaterals = self.web3_client.get_user_collaterals(user_address)
         total_collateral_usd = self.web3_client.get_collateral_value_usd(user_address)
-        _, borrowed, _ = self.web3_client.get_position_onchain(user_address)
+        _, borrowed_wei, _ = self.web3_client.get_position_onchain(user_address)
+
+        # Convert borrowed from Wei ETH to USD (8 decimals)
+        borrowed_usd = self.web3_client.convert_borrowed_to_usd(borrowed_wei)
 
         # Convert to decimal USD values
         collateral_usd_decimal = Decimal(total_collateral_usd) / Decimal(10**Config.USD_DECIMALS)
-        debt_usd_decimal = Decimal(borrowed) / Decimal(10**Config.USD_DECIMALS)
+        debt_usd_decimal = Decimal(borrowed_usd) / Decimal(10**Config.USD_DECIMALS)
 
         logger.info(
             f"Multi-asset profit calc | user={user_address[:10]}... | "
@@ -130,10 +133,10 @@ class ProfitCalculator:
         return gas_cost_usd
     
     def calculate_liquidation_amount(self, position: Position) -> int:
-        """Calculate total debt amount to repay in liquidation"""
+        """Calculate total debt amount to repay in liquidation (in Wei ETH)"""
         # For multi-collateral, liquidate full debt position
-        _, borrowed, _ = self.web3_client.get_position_onchain(position.user_address)
-        return borrowed
+        _, borrowed_wei, _ = self.web3_client.get_position_onchain(position.user_address)
+        return borrowed_wei  # Return Wei ETH for contract call
 
     def get_liquidation_summary(self, position: Position) -> dict:
         """Get detailed liquidation summary for multi-asset position"""
@@ -141,11 +144,12 @@ class ProfitCalculator:
             user_address = position.user_address
             collaterals = self.web3_client.get_user_collaterals(user_address)
             collateral_usd = self.web3_client.get_collateral_value_usd(user_address)
-            _, borrowed, _ = self.web3_client.get_position_onchain(user_address)
+            _, borrowed_wei, _ = self.web3_client.get_position_onchain(user_address)
+            borrowed_usd = self.web3_client.convert_borrowed_to_usd(borrowed_wei)
 
             return {
                 'user_address': user_address,
-                'total_debt_usd': borrowed / 10**Config.USD_DECIMALS,
+                'total_debt_usd': borrowed_usd / 10**Config.USD_DECIMALS,
                 'total_collateral_usd': collateral_usd / 10**Config.USD_DECIMALS,
                 'asset_count': len(collaterals),
                 'assets': [{

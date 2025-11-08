@@ -66,24 +66,25 @@ def run_liquidation_check():
             hf_raw = _web3_client_instance.get_health_factor(user_addr)
             hf_onchain = Decimal(hf_raw) / Decimal(100) if hf_raw < 999999 else Decimal("999.99")
 
-            collateral_usd, borrowed, _ = _web3_client_instance.get_position_onchain(user_addr)
+            collateral_usd, borrowed_wei, _ = _web3_client_instance.get_position_onchain(user_addr)
+            borrowed_usd = _web3_client_instance.convert_borrowed_to_usd(borrowed_wei)
 
             logger.debug(
                 f"[LIQUIDATION_CHECK] {user_addr[:10]}... | "
                 f"HF_graph={pos['healthFactor']} | HF_onchain={hf_onchain:.2f}"
             )
 
-            if hf_onchain < Decimal("1.0") and borrowed > 0:
+            if hf_onchain < Decimal("1.0") and borrowed_usd > 0:
                 liquidatable.append({
                     "user": user_addr,
                     "health_factor": hf_onchain,
                     "collateral_usd": collateral_usd,
-                    "borrowed": borrowed
+                    "borrowed": borrowed_usd  # Store USD (8 decimals) for Position model
                 })
                 logger.warning(
                     f"[LIQUIDATION_CHECK] 🚨 LIQUIDATABLE | "
                     f"user={user_addr[:10]}... | HF={hf_onchain:.2f} | "
-                    f"debt=${borrowed / 10**Config.USD_DECIMALS:.2f}"
+                    f"debt=${borrowed_usd / 10**Config.USD_DECIMALS:.2f}"
                 )
 
         logger.info(f"[LIQUIDATION_CHECK] Validated {len(liquidatable)} liquidatable positions on-chain")

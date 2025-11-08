@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Wallet, TrendingUp } from "lucide-react";
 import { useUserPosition, formatters } from "@/hooks/useUserPosition";
 import { useOraclePrices } from "@/hooks/useOraclePrices";
+import { useCollateralAmounts } from "@/hooks/useCollateralAmounts";
+import { TOKENS } from "@/lib/contracts/addresses";
 
 /**
  * TVLOverviewCard - Displays user's collateral with asset breakdown
@@ -19,11 +21,15 @@ export function TVLOverviewCard() {
   const { data: user, hasDeposits } = useUserPosition();
   const { prices, isLoading: isPricesLoading } = useOraclePrices();
 
-  // Debug: Log to verify this is the new version
-  console.log('[TVLOverviewCard] NEW VERSION - User data:', user?.id, 'hasDeposits:', hasDeposits);
+  // Read collateral amounts on-chain (real-time)
+  const { collaterals: onChainCollaterals, isLoading: collateralsLoading } = useCollateralAmounts();
+
+  // Debug: Log to verify this is the new version with on-chain data
+  console.log('[TVLOverviewCard] ON-CHAIN VERSION - Collaterals:', onChainCollaterals, 'Prices:', prices);
 
   // If no deposits, show empty state
-  if (!user || !hasDeposits || user.collaterals.length === 0) {
+  const hasCollateral = onChainCollaterals.length > 0;
+  if (!hasCollateral && !collateralsLoading) {
     return (
       <Card>
         <CardHeader>
@@ -43,47 +49,59 @@ export function TVLOverviewCard() {
     );
   }
 
-  // Parse total collateral in USD (8 decimals from Chainlink)
-  const totalCollateralUSD = formatters.usdToNumber(user.totalCollateralUSD);
-
-  // ANO_007 FIX: Use ETH price from OracleAggregator on-chain (via useOraclePrices)
-  // Fallback to 1600 if oracle prices are still loading
+  // Use real-time prices from OracleAggregator (via useOraclePrices)
   const ETH_PRICE = prices.ETH.oraclePrice || 1600;
+  const USDC_PRICE = prices.USDC.oraclePrice || 1.0;
+  const DAI_PRICE = prices.DAI.oraclePrice || 1.0;
 
-  // Build assets array - always show all 3 assets (ETH, USDC, DAI)
-  const allAssets = ["ETH", "USDC", "DAI"];
-  const assets = allAssets.map((symbol) => {
-    // Find collateral for this asset (if exists)
-    const collateral = user.collaterals.find(c => c.asset.symbol === symbol);
+  // Map on-chain collateral addresses to symbols and decimals
+  const assetMap: Record<string, { symbol: string; decimals: number; price: number; color: string }> = {
+    [TOKENS.ETH.toLowerCase()]: { symbol: "ETH", decimals: 18, price: ETH_PRICE, color: "bg-blue-500" },
+    [TOKENS.USDC.toLowerCase()]: { symbol: "USDC", decimals: 6, price: USDC_PRICE, color: "bg-green-500" },
+    [TOKENS.DAI.toLowerCase()]: { symbol: "DAI", decimals: 18, price: DAI_PRICE, color: "bg-yellow-500" },
+  };
 
-    // Parse amount (0 if not deposited)
-    const amount = collateral
-      ? formatters.tokenToNumber(collateral.amount, collateral.asset.decimals, symbol)
-      : 0;
-
-    // Calculate USD value
-    let valueUSD = 0;
-    if (symbol === "ETH") {
-      valueUSD = amount * ETH_PRICE;
-    } else if (symbol === "USDC" || symbol === "DAI") {
-      valueUSD = amount * 1.0; // $1 per stablecoin
+  // Convert on-chain collaterals to display format with real-time USD values
+  const assetsWithValues = onChainCollaterals.map((col) => {
+    const assetInfo = assetMap[col.address.toLowerCase()];
+    if (!assetInfo) {
+      console.warn('[TVLOverviewCard] Unknown asset:', col.address);
+      return null;
     }
 
-    // Calculate percentage
-    const percent = totalCollateralUSD > 0 ? (valueUSD / totalCollateralUSD) * 100 : 0;
-
-    // Assign color
-    let color = "bg-gray-500";
-    if (symbol === "ETH") color = "bg-blue-500";
-    else if (symbol === "USDC") color = "bg-green-500";
-    else if (symbol === "DAI") color = "bg-yellow-500";
+    const amount = Number(col.amount) / Math.pow(10, assetInfo.decimals);
+    const valueUSD = amount * assetInfo.price;
 
     return {
-      name: symbol,
+      name: assetInfo.symbol,
       amount,
       valueUSD,
-      percent,
-      color,
+      color: assetInfo.color,
+    };
+  }).filter((a) => a !== null);
+
+  // Calculate total collateral in USD (real-time)
+  const totalCollateralUSD = assetsWithValues.reduce((sum, asset) => sum + (asset?.valueUSD || 0), 0);
+
+  // Always show all 3 assets (ETH, USDC, DAI) even if balance is 0
+  const allAssets = ["ETH", "USDC", "DAI"];
+  const assets = allAssets.map((symbol) => {
+    const existing = assetsWithValues.find((a) => a?.name === symbol);
+    if (existing) {
+      return {
+        ...existing,
+        percent: totalCollateralUSD > 0 ? (existing.valueUSD / totalCollateralUSD) * 100 : 0,
+      };
+    }
+
+    // Asset not deposited - show as 0
+    const assetInfo = Object.values(assetMap).find((a) => a.symbol === symbol);
+    return {
+      name: symbol,
+      amount: 0,
+      valueUSD: 0,
+      percent: 0,
+      color: assetInfo?.color || "bg-gray-500",
     };
   });
 
