@@ -28,7 +28,7 @@ export default function DepositPage() {
               <InfoIcon className="h-4 w-4" />
               <AlertDescription>
                 Your deposited assets will be used as collateral. You can borrow up to the LTV (Loan-to-Value)
-                ratio of your collateral. Different assets have different LTV ratios: ETH (66%), USDC & DAI (75%).
+                ratio of your collateral. Different assets have different LTV ratios: ETH (66%), USDC & DAI (90%).
               </AlertDescription>
             </Alert>
 

@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet, TrendingUp } from "lucide-react";
 import { useUserPosition, formatters } from "@/hooks/useUserPosition";
+import { useOraclePrices } from "@/hooks/useOraclePrices";
 
 /**
  * TVLOverviewCard - Displays user's collateral with asset breakdown
@@ -16,6 +17,7 @@ import { useUserPosition, formatters } from "@/hooks/useUserPosition";
  */
 export function TVLOverviewCard() {
   const { data: user, hasDeposits } = useUserPosition();
+  const { prices, isLoading: isPricesLoading } = useOraclePrices();
 
   // Debug: Log to verify this is the new version
   console.log('[TVLOverviewCard] NEW VERSION - User data:', user?.id, 'hasDeposits:', hasDeposits);
@@ -44,8 +46,9 @@ export function TVLOverviewCard() {
   // Parse total collateral in USD (8 decimals from Chainlink)
   const totalCollateralUSD = formatters.usdToNumber(user.totalCollateralUSD);
 
-  // Calculate ETH price hardcoded at $2500 for now
-  const ETH_PRICE = 2500;
+  // ANO_007 FIX: Use ETH price from OracleAggregator on-chain (via useOraclePrices)
+  // Fallback to 1600 if oracle prices are still loading
+  const ETH_PRICE = prices.ETH.oraclePrice || 1600;
 
   // Build assets array - always show all 3 assets (ETH, USDC, DAI)
   const allAssets = ["ETH", "USDC", "DAI"];

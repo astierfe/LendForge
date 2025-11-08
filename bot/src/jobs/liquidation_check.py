@@ -95,7 +95,7 @@ def run_liquidation_check():
             position = Position(
                 user_address=liq_pos["user"],
                 collateral_amount=liq_pos["collateral_usd"],
-                borrowed_amount=liq_pos["borrowed"],
+                borrowed=liq_pos["borrowed"],
                 health_factor=liq_pos["health_factor"],
                 status="ACTIVE"
             )

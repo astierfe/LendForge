@@ -43,8 +43,9 @@ export function UserPositionCard() {
     args: [TOKENS.ETH],
   });
 
-  // Parse ETH price (8 decimals - Chainlink format), fallback to 2500 if not available
-  const ETH_PRICE = ethPrice ? parseFloat(formatUnits(ethPrice as bigint, 8)) : 2500;
+  // Parse ETH price (8 decimals - Chainlink format), fallback matches on-chain oracle
+  // TODO: Centralize price fetching when ANO_007 is resolved
+  const ETH_PRICE = ethPrice ? parseFloat(formatUnits(ethPrice as bigint, 8)) : 1600;
 
   // If no active borrow, show empty state
   if (!user || !hasActiveBorrow) {

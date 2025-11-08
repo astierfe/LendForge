@@ -57,7 +57,7 @@ class PositionMonitor:
                 # Update position with real on-chain data
                 position.health_factor = hf_onchain
                 position.collateral_amount = collateral_usd
-                position.borrowed_amount = borrowed
+                position.borrowed = borrowed
 
                 # Enhanced logging with multi-collateral details
                 collateral_summary = ", ".join([

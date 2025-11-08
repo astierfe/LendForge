@@ -32,19 +32,12 @@
 - Flask API exposée sur port 5000
 - Tests end-to-end validés: détection < 60s, liquidation automatique réussie
 
-**Documentation - v1.3.0** ✅
-- Spec technique complète avec formules correctes
-- Liquidation threshold: 83% ETH, 95% stablecoins (vérifié on-chain)
-- Leverage mechanism documenté avec exemples
-- Alignment report: code vs spec validation
-
 **Frontend Phase 1 & 2 - Infrastructure** ✅
 - Next.js 15 + React 19 + TypeScript
 - RainbowKit v2 + wagmi v2 (Sepolia)
 - Apollo Client avec @apollo/experimental-nextjs-app-support
 - Landing page avec stats réelles (GET_GLOBAL_METRICS query)
 - Layout authenticated (Sidebar, Header, MobileNav)
-- Routes protection et navigation
 - Composants layout réutilisables (PageContainer, Section, ContentGrid)
 - Styles organization (Tailwind utility-first, globals.css minimal)
 
@@ -79,6 +72,28 @@
 - Bug fixes: Dashboard "Available to Borrow" affichait 0.0000 ETH (ANO_003 workaround + USDC decimals 6), hasActiveBorrow robust check (3 fallbacks)
 - Tests validés: USER (200 DAI + 3,050 USDC, 0.99 ETH borrowed) et DEPLOYER (10,100 DAI + 101 USDC + 0.014 ETH)
 
+**Frontend Phase 5B - Analytics & Metrics** ✅ (v5.4.0)
+- 7 composants analytics: ProtocolMetricsCard, AssetDistributionChart, UtilizationGauge, TVLChart, RecentActivityCard, OraclePricesCard, LiquidationsHistoryCard
+- Hooks: useDailyMetrics, useRecentTransactions, useRecentLiquidations, useOraclePrices
+- Charts historiques: Recharts (LineChart/AreaChart/PieChart), période filters (7d/30d/all), responsive design
+- TVLChart: Affichage TVL historique avec avg utilization rate (ANO_005 workaround: pass ethPrice from useGlobalMetrics)
+- RecentActivityCard: Dernières 10 transactions DEPOSIT/BORROW/REPAY/WITHDRAW avec asset symbols (fix BORROW/REPAY showing "UNKNOWN")
+- LiquidationsHistoryCard: Historique liquidations avec time filters (asset filters removed: collateralAsset non-existant dans schema)
+- OraclePricesCard: Prix temps réel ETH/USDC/DAI depuis PriceRegistry contract
+- Production page /analytics fully functional avec données subgraph + on-chain
+- Known Issues: ANO_001-005 avec workarounds frontend documentés (_docs/KNOWN_ISSUES.md + _docs/issues/ANO_005_dailymetric-missing-eth-price.md)
+
+**Frontend Phase 5C - Repay & Withdraw Flows** ✅ (v5.5.0)
+- 2 hooks simulation: useRepaySimulation (HF après repay, pas d'intérêts time-based dans contrat actuel), useWithdrawSimulation (HF safety >= 1.2, maxSafeWithdraw vs maxAbsoluteWithdraw)
+- RepayForm: Input ETH, MAX button (borrowed amount sans intérêts estimés), HF preview (Current → New ↑), LendingPool.repay() payable, validation wallet balance avec gas reserve (0.002 ETH)
+- WithdrawForm: AssetSelector tabs (ETH/USDC/DAI), MAX button (safe threshold 1.2), HF preview avec safety warnings (orange < 1.2, red block < 1.0), CollateralManager.withdrawETH/withdrawERC20
+- Navigation: Sidebar links "Repay" + "Withdraw" (icons ArrowUpFromLine/ArrowDownFromLine), QuickActionsCard grid 4 colonnes (Deposit/Borrow/Repay/Withdraw)
+- Pages /repay et /withdraw: Layout 2-colonnes (Form 60% | Sidebar Info 40%), info contextuelle (How Repayment Works, Withdrawal Rules, HF Safety, Liquidation Risk)
+- Fixes: Interest estimation retirée (contract refund excess LendingPool.sol:143-147), MAX button cohérent (0.35 ETH au lieu de 0.351438), TVLOverviewCard affiche toujours 3 assets même si 0 collateral
+- Tests validés: Repay partiel/total USER (0.99 ETH → 0), Withdraw USDC+DAI USER (3,050 USDC + 200 DAI → 0), Edge cases (HF < 1.0 blocked, HF 1.0-1.2 warning)
+- ANO_007 créée: Hardcoded Prices & Duplicated Calculations (ETH=$2500, USDC/DAI=$1, formules HF/USD dupliquées 8+ fichiers), fix planifié Phase 6 (lib/contracts/prices.ts + lib/utils/calculations.ts)
+- Subgraph delay: Dashboard refresh ~30s Sepolia testnet (acceptable pour MVP, amélioration Vercel+mainnet attendue)
+
 ---
 
 ## 🎯 Prochaine Priorité: Phase 6A - End-to-End Testing
@@ -102,6 +117,8 @@ Voir détails complets dans section "Phase 6: Testing & Stabilization" ci-dessou
 ### Phase 5A: Borrow Flow ✅ (Complété v5.3.0)
 
 ### Phase 5B: Analytics & Metrics ✅ (Complété v5.4.0)
+
+### Phase 5C: REPAY & WITHDRAW Flows ✅ (Complété v5.5.0)
 
 ### Phase 6: Testing & Stabilization 🎯 (Objectif Actuel)
 
