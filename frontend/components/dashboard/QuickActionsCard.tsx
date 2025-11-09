@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Zap, ArrowDownFromLine as WithdrawIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useUserPosition } from "@/hooks/useUserPosition";
+import { useOnChainPosition } from "@/hooks/useOnChainPosition";
 import { useHealthFactor } from "@/hooks/useHealthFactor";
 
 /**
@@ -26,8 +27,12 @@ import { useHealthFactor } from "@/hooks/useHealthFactor";
  */
 export function QuickActionsCard() {
   const router = useRouter();
-  const { data: user, hasDeposits, hasActiveBorrow } = useUserPosition();
+  const { data: user, hasDeposits } = useUserPosition();
   const healthFactor = useHealthFactor();
+
+  // Get on-chain position (centralized)
+  const { position } = useOnChainPosition();
+  const { hasActiveBorrow } = position;
 
   // Determine if actions are available
   const canDeposit = true; // Always can deposit

@@ -94,13 +94,41 @@
 - ANO_007 créée: Hardcoded Prices & Duplicated Calculations (ETH=$2500, USDC/DAI=$1, formules HF/USD dupliquées 8+ fichiers), fix planifié Phase 6 (lib/contracts/prices.ts + lib/utils/calculations.ts)
 - Subgraph delay: Dashboard refresh ~30s Sepolia testnet (acceptable pour MVP, amélioration Vercel+mainnet attendue)
 
+**Frontend Phase 6A: - End-to-end Testing** ✅ (v6.0.2)
+- 3 scénarios testes : 1.Liquidation Bot End-to-End, 2. REPAY Flow (Partiel + Total) et 3.Gains Scenario (Price Increase)
+Resultat :  
+- Bot détecte et liquide positions risquées en < 2 minutes
+- REPAY flow fonctionne (partiel + total) sans erreurs
+- Frontend Dashboard + Analytics 100% cohérents après chaque transaction
+- Aucun nouveau bug critique découvert (ou documenté si trouvé) 
+
 ---
 
-## 🎯 Prochaine Priorité: Phase 6A - End-to-End Testing
+## 🎯 Prochaine Priorité: Phase 6B - Code Quality & Refactoring
 
-**Objectif de la prochaine conversation:** Valider scénarios critiques (liquidation bot, repay flow) pour détecter bugs avant modifications smart contracts.
+**Objectif:** Eliminate hardcoded values, centralize calculations, and establish utility layer architecture across frontend, bot, contracts, and subgraph to prepare for production and future asset expansion.
 
-Voir détails complets dans section "Phase 6: Testing & Stabilization" ci-dessous.
+**Why Now:**
+- Phase 6A revealed ~30 instances of code duplication (decimals, formulas, conversions)
+- ANO_014 fix (v6.0.2) created `lib/utils/tvl.ts` as proof-of-concept for refactoring benefits
+- Current hardcoded values (ETH=$2500, decimals=18/6) scattered across 15+ files create maintenance burden
+- **Mainnet blocker:** Production deployment requires centralized price fetching and consistent formula execution
+
+**Success Criteria:**
+- Zero magic numbers (18, 6, 1e8, 1e18) in business logic
+- Zero duplicated formulas (HF, TVL, USD conversion) - single source of truth per calculation
+- All regression tests pass with identical results before/after refactor
+- New asset addition (e.g., LINK) requires only updating constants, not touching 8+ files
+
+**Scope:**
+1. **Frontend utilities** (calculations, prices, formatting, constants) - Week 1-2
+2. **Bot utilities** (conversions, calculations, constants) - Week 3
+3. **Documentation & validation** - Week 4
+4. **Contracts/Subgraph** (deferred unless duplication audit reveals critical issues)
+
+**Estimated Duration:** 3-4 weeks | **Priority:** High (pre-mainnet requirement)
+
+See detailed implementation plan in ANO_007 and "Phase 6B" section below.
 
 ---
 
@@ -120,101 +148,75 @@ Voir détails complets dans section "Phase 6: Testing & Stabilization" ci-dessou
 
 ### Phase 5C: REPAY & WITHDRAW Flows ✅ (Complété v5.5.0)
 
-### Phase 6: Testing & Stabilization 🎯 (Objectif Actuel)
+### Phase 6: Testing & Stabilization ✅ (Complété v6.0.0)
 
-### Phase 6A: End-to-End Testing ⏳ (Priorité CRITIQUE)
+### Phase 6A: End-to-End Testing ✅ (Complété v6.0.2)
 
-**Objectif:** Valider les scénarios critiques du protocole et détecter les bugs avant modifications smart contracts.
+### Phase 6B: Code Quality & Refactoring ⏳ (En cours v6.0.2+)
 
-**Scénarios à Tester:**
+**Objectif:** Eliminate code duplication, centralize constants/calculations, establish production-grade utility architecture across all layers (frontend, bot, contracts, subgraph).
 
-**1. Test Liquidation Bot End-to-End**
-- Créer position avec low health factor (HF < 1.2): deposit minimal collateral + borrow max
-- Trigger liquidation scenario: modifier ETH price via mock oracle pour faire HF < 1.0
-- Lancer bot Python en mode monitoring (APScheduler jobs actifs)
-- Vérifier détection risky position (health_monitor job < 60s)
-- Vérifier exécution liquidation automatique (liquidation_check job)
-- Valider cohérence Frontend après liquidation:
-  - Dashboard user: Position liquidée → Collateral/Borrowed à jour
-  - Analytics LiquidationsHistoryCard: Event affiché avec debt repaid + collateral seized
-  - Subgraph: LiquidationEvent entity créée avec bonnes valeurs (user, liquidator, amounts)
-  - Transaction Etherscan: Vérifier logs et gas used
+**Status:** Partial (15% complete) - `lib/utils/tvl.ts` (v6.0.2) + `lib/utils/position.ts` (v6.0.3) + `hooks/useOnChainPosition.ts` (v6.0.3)
 
-**2. Test REPAY Flow (Partiel + Total)**
-- Setup: User avec position active (collateral deposited, ETH borrowed)
-- Test REPAY partiel: Rembourser 50% du borrowed amount
-  - Vérifier Health Factor augmente correctement
-  - Vérifier Total Borrowed décrémente dans Dashboard
-  - Vérifier RecentActivityCard affiche transaction REPAY
-- Test REPAY total: Rembourser 100% restant
-  - Vérifier position status → No active borrow (hasActiveBorrow = false)
-  - Vérifier disponibilité withdraw collateral (unlock après full repay)
-  - Vérifier Utilization Rate globale se met à jour dans Analytics
+**Architecture Plan:**
 
-**3. Test Gains Scenario (Price Increase)**
-- Setup: User avec HF = 1.3 (risky mais non-liquidable)
-- Simuler gain: ETH price increases +20% via mock oracle
-- Vérifier HF remonte automatiquement (collateral value ↑)
-- Vérifier Available to Borrow augmente proportionnellement
-- Tester nouveau borrow additionnel avec HF safe (> 2.0)
+**Frontend Utilities** (`frontend/lib/utils/`)
+- ✅ `tvl.ts` - TVL calculations with correct decimal handling (created v6.0.2)
+- ✅ `position.ts` - **LTV calculation, collateral USD parsing (ANO_003 workaround), borrowed amount parsing (created v6.0.3)**
+- ✅ `index.ts` - **Barrel exports for utils (created v6.0.3)**
+- 📝 `calculations.ts` - Health Factor, max borrow/withdraw, weighted LTV/LT formulas
+- 📝 `prices.ts` - USD conversion, price parsing, decimal handling
+- 📝 `formatting.ts` - formatUSD, formatTokenAmount, formatPercentage, formatCompactNumber
+- 📝 `constants.ts` - ASSET_DECIMALS, LTV_RATIOS, LIQUIDATION_THRESHOLDS, HF_THRESHOLDS
 
-**Validation Frontend (Checklist):**
-- [ ] Dashboard UserPositionCard: Collateral/Borrowed/HF real-time updates
-- [ ] Analytics TVLChart: TVL increases/decreases reflected
-- [ ] Analytics RecentActivityCard: All transactions (DEPOSIT/BORROW/REPAY/LIQUIDATION) visible
-- [ ] Analytics LiquidationsHistoryCard: Liquidation events avec amounts corrects
-- [ ] Subgraph entities: User, Position, GlobalMetric, DailyMetric, Events cohérents
-- [ ] Bot logs: Detection timing, profitability calculation, gas estimation
+**Bot Utilities** (`bot/src/utils/`)
+- 📝 `conversions.py` - wei_to_usd, parse_collateral_amount (eliminate `(amount * price) // 10**18` duplication)
+- 📝 `calculations.py` - calculate_health_factor, calculate_liquidation_profit (same formulas as frontend)
+- 📝 `constants.py` - ASSET_DECIMALS, LTV_RATIOS (centralize config instead of scattered in 4 modules)
 
-**Critères de Succès Phase 6A:**
-- [ ] Bot détecte et liquide positions risquées en < 2 minutes
-- [ ] REPAY flow fonctionne (partiel + total) sans erreurs
-- [ ] Frontend Dashboard + Analytics 100% cohérents après chaque transaction
-- [ ] Aucun nouveau bug critique découvert (ou documenté si trouvé)
+**Contracts** (audit-dependent)
+- 📝 `libraries/HealthFactorLib.sol` - Only if HF duplicated in LendingPool + CollateralManager
+- 📝 `libraries/Constants.sol` - Centralize thresholds/decimals (if duplication found)
 
----
+**Subgraph** (deferred to ANO_004 fix)
+- 📝 `src/utils/calculations.ts` - convertToUSD for decimal normalization
+- 📝 `src/utils/constants.ts` - ASSET_DECIMALS mapping
 
-### Phase 6B: Code Quality & Refactoring ⏳ (Après 6A)
+**Implementation Tasks:**
 
-**Objectif:** Éliminer hardcoded values, factoriser calculs, préparer évolutivité (Uniswap, multiple assets).
+**Week 1: Audit & Create**
+- [ ] Grep audit: Find all `18`, `6`, `1e8`, `1e18`, `10 ** 18` instances
+- [ ] Create 4 frontend utilities (calculations, prices, formatting, constants)
+- [ ] Create 3 bot utilities (conversions, calculations, constants)
+- [ ] Write unit tests for all functions
 
-**Tasks:**
+**Week 2: Frontend Refactoring**
+- [ ] Replace hardcoded decimals (18/6) with `ASSET_DECIMALS[symbol]` (15+ instances)
+- [ ] Replace duplicated HF formula with `calculateHealthFactor()` (6 files)
+- [ ] Replace Wei→USD conversions with `convertToUSD()` (10+ instances)
+- [ ] Replace max borrow/withdraw logic with shared utilities (3 hooks)
+- [ ] Regression test all flows (deposit, borrow, repay, withdraw)
 
-**1. Audit Valeurs Hardcodées**
-- Grep recherche: `1.0`, `18`, `6`, `$1` dans hooks et components
-- Créer `frontend/lib/constants.ts`:
-```typescript
-export const ASSET_CONFIG = {
-  ETH: { decimals: 18, symbol: "ETH", address: "0xeeee...", priceSource: "oracle" },
-  USDC: { decimals: 6, symbol: "USDC", address: "0xc470...", priceSource: "hardcoded", price: 1.0 },
-  DAI: { decimals: 18, symbol: "DAI", address: "0x2fa3...", priceSource: "hardcoded", price: 1.0 }
-} as const;
-```
-- Remplacer tous hardcoded decimals/prices par `ASSET_CONFIG[symbol]`
+**Week 3: Bot Refactoring**
+- [ ] Replace `(amount * price) // (10 ** 18)` with `wei_to_usd()` (5 instances)
+- [ ] Centralize decimal handling in `conversions.py` (eliminate hardcoded 18/6)
+- [ ] Use shared `calculate_health_factor()` from `calculations.py`
+- [ ] Update bot tests to use new utilities
 
-**2. Factorisation Calculs**
-- Identifier duplications: TVL calculation dans useGlobalMetrics, useDailyMetrics, useHealthFactor
-- Créer `frontend/lib/calculators.ts`:
-```typescript
-export function calculateTVL(ethAmount: number, usdcAmount: number, daiAmount: number, ethPrice: number): number
-export function calculateBorrowedUSD(borrowedEth: number, ethPrice: number): number
-export function calculateUtilization(borrowed: number, tvl: number): number
-export function calculateHealthFactor(collateralUSD: number, borrowedUSD: number, weightedLT: number): number
-```
-- Centraliser toutes les formules avec JSDoc expliquant calcul
+**Week 4: Validation**
+- [ ] JSDoc/docstrings for all utilities with examples
+- [ ] Create `PHASE_6B_COMPLETION_REPORT.md`
+- [ ] Verify consistency: Same inputs → Same outputs across frontend/bot
+- [ ] Performance benchmark: No regression in calculation speed
 
-**3. Code Review Checklist**
-- [ ] Remplacer hardcoded decimals par ASSET_CONFIG
-- [ ] Remplacer hardcoded prices ($1 stablecoins) par config
-- [ ] Centraliser conversions Wei→ETH→USD
-- [ ] Factoriser calculateTVL/Borrowed/Utilization
-- [ ] Documenter formules dans JSDoc (TVL, HF, LTV, etc.)
-- [ ] Vérifier consistency: même calcul = même résultat partout
+**Benefits:**
+- **Maintainability:** Price change = 1 constant update (not 8 files)
+- **Evolvability:** New asset (LINK) = 1 line in constants (not 15+ files)
+- **Testability:** Unit test `calculateHealthFactor()` once with 100% coverage
+- **Consistency:** Frontend HF = Bot HF = Contract HF (same formula, zero drift)
+- **Production-Ready:** Centralized price fetching required for mainnet launch
 
-**Bénéfices:**
-- Évolutivité: Ajout nouveaux assets (LINK, WBTC) = 1 ligne dans ASSET_CONFIG
-- Maintenabilité: Formule modifiée 1 seul endroit
-- Testabilité: Unit tests sur calculators.ts isolés
+**Related:** ANO_007 (detailed plan), ANO_014 (TVL fix proof-of-concept), EVO_001 (price injection integration)
 
 ---
 

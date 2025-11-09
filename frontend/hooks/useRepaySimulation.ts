@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useReadContract } from "wagmi";
 import { formatUnits } from "viem";
 import { useUserPosition, formatters } from "./useUserPosition";
+import { useOnChainPosition } from "./useOnChainPosition";
 import { CONTRACTS, TOKENS } from "@/lib/contracts/addresses";
 
 export interface RepaySimulationResult {
@@ -44,21 +45,9 @@ export function useRepaySimulation(
 ): RepaySimulationResult {
   const { data: user } = useUserPosition();
 
-  // Get ETH price from oracle
-  const { data: ethPrice } = useReadContract({
-    address: CONTRACTS.ORACLE_AGGREGATOR,
-    abi: [
-      {
-        inputs: [{ name: "asset", type: "address" }],
-        name: "getPrice",
-        outputs: [{ name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function",
-      },
-    ],
-    functionName: "getPrice",
-    args: [TOKENS.ETH], // ETH address
-  });
+  // Get on-chain position (centralized - includes ETH price)
+  const { position } = useOnChainPosition();
+  const { borrowedETH: currentBorrowedETH, ethPriceUSD } = position;
 
   const simulation = useMemo((): RepaySimulationResult => {
     // Default empty result
@@ -81,26 +70,15 @@ export function useRepaySimulation(
       };
     }
 
-    // Must have active borrow
-    if (!user.totalBorrowed || parseFloat(user.totalBorrowed) === 0) {
+    // Must have active borrow (use on-chain data)
+    if (currentBorrowedETH === 0) {
       return {
         ...emptyResult,
         warningMessage: "No active borrows to repay.",
       };
     }
 
-    // Parse ETH price (8 decimals - Chainlink format)
-    if (!ethPrice) {
-      return {
-        ...emptyResult,
-        warningMessage: "Unable to fetch ETH price.",
-      };
-    }
-
-    const ethPriceUSD = parseFloat(formatUnits(ethPrice as bigint, 8));
-
-    // Parse user position data
-    const currentBorrowedETH = formatters.weiToEth(user.totalBorrowed); // 18 decimals
+    // currentBorrowedETH and ethPriceUSD now come from useOnChainPosition
 
     // No interest accrual in current contract implementation (fixed rate, no time-based accrual)
     // Contract will refund any excess payment (see LendingPool.sol:143-147)
@@ -187,7 +165,7 @@ export function useRepaySimulation(
       ethPriceUSD,
       estimatedInterestETH,
     };
-  }, [user, repayAmountETH, ethPrice]);
+  }, [user, repayAmountETH, currentBorrowedETH, ethPriceUSD]);
 
   return simulation;
 }

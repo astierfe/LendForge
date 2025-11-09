@@ -13,6 +13,7 @@ import { Loader2, CheckCircle2, AlertCircle, ArrowRight, TrendingUp, Shield } fr
 import { CONTRACTS } from "@/lib/contracts/addresses";
 import { useRepaySimulation } from "@/hooks/useRepaySimulation";
 import { useUserPosition } from "@/hooks/useUserPosition";
+import { useOnChainPosition } from "@/hooks/useOnChainPosition";
 import { useHealthFactor } from "@/hooks/useHealthFactor";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -40,7 +41,12 @@ export function RepayForm() {
   const [isRepaying, setIsRepaying] = useState(false);
 
   // User data
-  const { data: user, refetch: refetchUserPosition, hasActiveBorrow } = useUserPosition();
+  const { data: user, refetch: refetchUserPosition } = useUserPosition();
+
+  // Get on-chain position (centralized)
+  const { position } = useOnChainPosition();
+  const { borrowedETH: totalBorrowedETH, hasActiveBorrow } = position;
+
   const currentHealthFactor = useHealthFactor();
 
   // Repay simulation

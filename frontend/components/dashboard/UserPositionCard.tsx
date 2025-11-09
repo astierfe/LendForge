@@ -3,12 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingDown, AlertCircle, ArrowRight } from "lucide-react";
-import { useUserPosition, formatters } from "@/hooks/useUserPosition";
+import { useUserPosition } from "@/hooks/useUserPosition";
 import { calculateMaxBorrowable } from "@/hooks/useHealthFactor";
-import { useBorrowedAmount } from "@/hooks/useBorrowedAmount";
-import { useReadContract } from "wagmi";
-import { formatUnits } from "viem";
-import { CONTRACTS, TOKENS } from "@/lib/contracts/addresses";
+import { useOnChainPosition } from "@/hooks/useOnChainPosition";
 import Link from "next/link";
 
 /**
@@ -20,41 +17,28 @@ import Link from "next/link";
  * - Current LTV used (%)
  * - Links to manage position (Borrow/Repay)
  *
- * Data source: useUserPosition hook + calculateMaxBorrowable helper
+ * Data source: useOnChainPosition (centralized on-chain data)
  */
 export function UserPositionCard() {
-  const { data: user, hasActiveBorrow } = useUserPosition();
+  const { data: user } = useUserPosition();
 
-  // Read borrowed amount on-chain (real-time)
-  const { borrowedETH: totalBorrowedETH, isLoading: borrowLoading } = useBorrowedAmount();
+  // Get all position data from centralized hook (single source of truth)
+  const { position } = useOnChainPosition();
+
+  const {
+    borrowedETH: totalBorrowedETH,
+    borrowedUSD: totalBorrowedUSD,
+    collateralUSD: totalCollateralUSD,
+    ethPriceUSD: ETH_PRICE,
+    ltvPercent: ltvUsed,
+    hasActiveBorrow,
+  } = position;
 
   // Debug: Log to verify data
-  console.log('[UserPositionCard] User data:', user?.id, 'hasActiveBorrow:', hasActiveBorrow, 'borrowedETH:', totalBorrowedETH);
+  console.log('[UserPositionCard] ON-CHAIN POSITION:', position);
 
-  // Get ETH price from oracle (same as BorrowForm)
-  const { data: ethPrice } = useReadContract({
-    address: CONTRACTS.ORACLE_AGGREGATOR,
-    abi: [
-      {
-        inputs: [{ name: "asset", type: "address" }],
-        name: "getPrice",
-        outputs: [{ name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function",
-      },
-    ],
-    functionName: "getPrice",
-    args: [TOKENS.ETH],
-  });
-
-  // Parse ETH price (8 decimals - Chainlink format), fallback matches on-chain oracle
-  // TODO: Centralize price fetching when ANO_007 is resolved
-  const ETH_PRICE = ethPrice ? parseFloat(formatUnits(ethPrice as bigint, 8)) : 1600;
-
-  // If no active borrow, show empty state
-  // Check both subgraph and on-chain data
-  const hasDebt = totalBorrowedETH > 0;
-  if (!user || (!hasActiveBorrow && !hasDebt)) {
+  // If no active borrow, show empty state (use on-chain data only)
+  if (!user || !hasActiveBorrow) {
     return (
       <Card>
         <CardHeader>
@@ -82,14 +66,8 @@ export function UserPositionCard() {
     );
   }
 
-  // Use on-chain borrowed amount (real-time) instead of subgraph
-  // totalBorrowedETH comes from useBorrowedAmount() hook above
-  const totalBorrowedUSD = totalBorrowedETH * ETH_PRICE;
-
-  // Parse total collateral (USD with 8 decimals)
-  const totalCollateralUSD = formatters.usdToNumber(user.totalCollateralUSD);
-
   // Calculate max borrowable and available to borrow
+  // Note: Still using subgraph user.collaterals for LTV ratios until we fetch them on-chain
   const maxBorrowableUSD = calculateMaxBorrowable(
     user.totalCollateralUSD,
     user.totalBorrowed,
@@ -98,9 +76,6 @@ export function UserPositionCard() {
   );
   const availableToBorrowUSD = Math.max(0, maxBorrowableUSD - totalBorrowedUSD);
   const availableToBorrowETH = availableToBorrowUSD / ETH_PRICE;
-
-  // Calculate current LTV used (%)
-  const ltvUsed = totalCollateralUSD > 0 ? (totalBorrowedUSD / totalCollateralUSD) * 100 : 0;
 
   // Determine if user is approaching max LTV (warning at 80%+ of max)
   const ltvWarningThreshold = 80;

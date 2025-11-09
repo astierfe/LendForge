@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, PlusCircle, TrendingDown, ArrowUpFromLine, ArrowDownFromLine, Wallet, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, TrendingDown, ArrowUpFromLine, ArrowDownFromLine, Wallet, BarChart3, ShieldAlert } from 'lucide-react';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 
 const navItems = [
   {
@@ -45,6 +46,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { isAdmin } = useAdminAccess();
 
   return (
     <aside className="w-64 border-r bg-muted/40 p-4 hidden md:block">
@@ -77,6 +79,25 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Admin Link - Only visible to deployer */}
+          {isAdmin && (
+            <>
+              <div className="border-t my-2 pt-2" />
+              <Link
+                href="/admin"
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
+                  pathname === '/admin'
+                    ? 'bg-red-600 text-white'
+                    : 'hover:bg-red-50 hover:text-red-600 text-red-600'
+                )}
+              >
+                <ShieldAlert className="w-5 h-5" />
+                <span className="font-semibold">Admin</span>
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </aside>

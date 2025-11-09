@@ -36,7 +36,8 @@ subgraph/build/
 cache/
 broadcast/
 
-lib/
+# Ignore lib/ at root only (not frontend/lib/)
+/lib/
 
 _docs/
 
