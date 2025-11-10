@@ -1,7 +1,7 @@
 # LendForge - Roadmap Développement
 
-**Version actuelle:** v5.4.0
-**Dernière mise à jour:** 5 novembre 2025
+**Version actuelle:** v6.0.3
+**Dernière mise à jour:** 9 novembre 2025
 
 ---
 
@@ -94,7 +94,7 @@
 - ANO_007 créée: Hardcoded Prices & Duplicated Calculations (ETH=$2500, USDC/DAI=$1, formules HF/USD dupliquées 8+ fichiers), fix planifié Phase 6 (lib/contracts/prices.ts + lib/utils/calculations.ts)
 - Subgraph delay: Dashboard refresh ~30s Sepolia testnet (acceptable pour MVP, amélioration Vercel+mainnet attendue)
 
-**Frontend Phase 6A: - End-to-end Testing** ✅ (v6.0.2)
+**Frontend Phase 6A: - End-to-end Testing** ✅ (v6.0.3)
 - 3 scénarios testes : 1.Liquidation Bot End-to-End, 2. REPAY Flow (Partiel + Total) et 3.Gains Scenario (Price Increase)
 Resultat :  
 - Bot détecte et liquide positions risquées en < 2 minutes

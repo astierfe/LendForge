@@ -12,23 +12,27 @@
  * @param totalUSDCDeposited - Raw amount (6 decimals)
  * @param totalDAIDeposited - Raw Wei amount (18 decimals)
  * @param ethPrice - ETH price in USD
+ * @param usdcPrice - USDC price in USD (default 1.0)
+ * @param daiPrice - DAI price in USD (default 1.0)
  * @returns Total TVL in USD
  */
 export function calculateGlobalTVL(
   totalETHDeposited: string,
   totalUSDCDeposited: string,
   totalDAIDeposited: string,
-  ethPrice: number
+  ethPrice: number,
+  usdcPrice: number = 1.0,
+  daiPrice: number = 1.0
 ): number {
   // Parse each asset with correct decimals
   const ethDeposited = parseFloat(totalETHDeposited) / 1e18;  // 18 decimals
   const usdcDeposited = parseFloat(totalUSDCDeposited) / 1e6; // 6 decimals (CRITICAL!)
   const daiDeposited = parseFloat(totalDAIDeposited) / 1e18;  // 18 decimals
 
-  // Convert to USD
+  // Convert to USD using oracle prices
   const ethValueUSD = ethDeposited * ethPrice;
-  const usdcValueUSD = usdcDeposited * 1.0; // Stablecoin
-  const daiValueUSD = daiDeposited * 1.0;   // Stablecoin
+  const usdcValueUSD = usdcDeposited * usdcPrice; // Use oracle price (ANO_009 fix)
+  const daiValueUSD = daiDeposited * daiPrice;     // Use oracle price (ANO_009 fix)
 
   // Calculate total
   return ethValueUSD + usdcValueUSD + daiValueUSD;

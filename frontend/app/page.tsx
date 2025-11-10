@@ -52,13 +52,15 @@ export default function LandingPage() {
   const globalMetrics = data?.globalMetrics?.[0];
   const activePositionsCount = data?.activeUsers?.length || 0;
 
-  // Calculate TVL correctly using individual asset totals (workaround for ANO_004)
+  // Calculate TVL correctly using individual asset totals (workaround for ANO_004 & ANO_009)
   const totalTVL = globalMetrics
     ? calculateGlobalTVL(
         globalMetrics.totalETHDeposited,
         globalMetrics.totalUSDCDeposited,
         globalMetrics.totalDAIDeposited,
-        oracleData.prices.ETH.oraclePrice || 3450 // Use real-time oracle price with fallback
+        oracleData.prices.ETH.oraclePrice || 3450, // ETH price from oracle
+        oracleData.prices.USDC.oraclePrice || 1.0, // USDC price from oracle (ANO_009 fix)
+        oracleData.prices.DAI.oraclePrice || 1.0   // DAI price from oracle (ANO_009 fix)
       )
     : 0;
 

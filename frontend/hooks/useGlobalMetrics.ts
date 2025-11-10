@@ -75,7 +75,7 @@ export function useGlobalMetrics() {
   const metricsData = data?.globalMetrics?.[0];
   const activePositionsCount = data?.activeUsers?.length ?? 0;
 
-  // Fetch ETH price from OracleAggregator contract
+  // Fetch prices from OracleAggregator contract
   const { data: ethPriceRaw } = useReadContract({
     address: process.env.NEXT_PUBLIC_ORACLE_AGGREGATOR_ADDRESS as `0x${string}`,
     abi: OracleAggregatorABI.abi,
@@ -83,13 +83,33 @@ export function useGlobalMetrics() {
     args: [process.env.NEXT_PUBLIC_ETH_ADDRESS], // ETH address
   });
 
-  // Convert ETH price (8 decimals - Chainlink format) to number
+  const { data: usdcPriceRaw } = useReadContract({
+    address: process.env.NEXT_PUBLIC_ORACLE_AGGREGATOR_ADDRESS as `0x${string}`,
+    abi: OracleAggregatorABI.abi,
+    functionName: "getPrice",
+    args: [process.env.NEXT_PUBLIC_USDC_ADDRESS], // USDC address
+  });
+
+  const { data: daiPriceRaw } = useReadContract({
+    address: process.env.NEXT_PUBLIC_ORACLE_AGGREGATOR_ADDRESS as `0x${string}`,
+    abi: OracleAggregatorABI.abi,
+    functionName: "getPrice",
+    args: [process.env.NEXT_PUBLIC_DAI_ADDRESS], // DAI address
+  });
+
+  // Convert prices (8 decimals - Chainlink format) to numbers
   const ethPrice = ethPriceRaw
     ? formatters.usdToNumber(ethPriceRaw.toString())
     : 0;
+  const usdcPrice = usdcPriceRaw
+    ? formatters.usdToNumber(usdcPriceRaw.toString())
+    : 1.0;
+  const daiPrice = daiPriceRaw
+    ? formatters.usdToNumber(daiPriceRaw.toString())
+    : 1.0;
 
-  // Calculate TVL manually (ANO_004 workaround)
-  // Formula: TVL = (ETH_amount × ETH_price) + (USDC_amount × $1) + (DAI_amount × $1)
+  // Calculate TVL manually (ANO_004 & ANO_009 workaround)
+  // Formula: TVL = (ETH_amount × ETH_price) + (USDC_amount × USDC_price) + (DAI_amount × DAI_price)
   const ethAmount = metricsData
     ? formatters.weiToEth(metricsData.totalETHDeposited ?? "0")
     : 0;
@@ -101,8 +121,8 @@ export function useGlobalMetrics() {
     : 0;
 
   const ethTVL = ethAmount * ethPrice;
-  const usdcTVL = usdcAmount * 1.0; // USDC = $1 (hardcoded on testnet)
-  const daiTVL = daiAmount * 1.0; // DAI = $1 (hardcoded on testnet)
+  const usdcTVL = usdcAmount * usdcPrice; // Use oracle price (ANO_009 fix)
+  const daiTVL = daiAmount * daiPrice; // Use oracle price (ANO_009 fix)
   const totalTVL = ethTVL + usdcTVL + daiTVL;
 
   // Calculate total borrowed (convert from Wei to USD)

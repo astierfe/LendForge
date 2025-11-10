@@ -51,6 +51,7 @@ type CollateralAsset @entity(immutable: false) {
 }
 
 enum PositionStatus {
+  INACTIVE      # Position created but no borrow yet (ANO_009 fix)
   ACTIVE
   REPAID
   LIQUIDATED

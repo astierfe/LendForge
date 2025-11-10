@@ -18,85 +18,13 @@ import {
   updateDailyMetricOnRepay,
   updateDailyMetricOnLiquidate
 } from "./daily-metrics"
+import {
+  getOrCreateUser,
+  getOrCreatePosition
+} from "./helpers"
 
 const ZERO_BD = BigDecimal.fromString("0")
 const ZERO_BI = BigInt.zero()
-
-function getOrCreateUser(address: string, timestamp: BigInt): User {
-  let user = User.load(address)
-
-  if (!user) {
-    user = new User(address)
-    user.totalCollateralUSD = ZERO_BI
-    user.totalBorrowed = ZERO_BI
-    user.activePositions = 0
-    user.lifetimeDeposits = ZERO_BI
-    user.lifetimeBorrows = ZERO_BI
-    user.lifetimeRepayments = ZERO_BI
-    user.liquidationCount = 0
-    user.createdAt = timestamp
-    user.updatedAt = timestamp
-    user.save()
-
-    updateGlobalMetric(timestamp, "newUser")
-  }
-
-  return user
-}
-
-function getOrCreatePosition(userId: string, timestamp: BigInt): Position {
-  let positionId = userId
-  let position = Position.load(positionId)
-
-  if (!position) {
-    position = new Position(positionId)
-    position.user = userId
-    position.totalCollateralUSD = ZERO_BI
-    position.borrowed = ZERO_BI
-    position.healthFactor = BigDecimal.fromString("999.99")
-    position.status = "ACTIVE"
-    position.createdAt = timestamp
-    position.updatedAt = timestamp
-    position.save()
-
-    updateGlobalMetric(timestamp, "newPosition")
-  }
-
-  return position
-}
-
-function updateGlobalMetric(timestamp: BigInt, action: string): void {
-  let globalId = "global"
-  let global = GlobalMetric.load(globalId)
-
-  if (!global) {
-    global = new GlobalMetric(globalId)
-    global.totalUsers = 0
-    global.totalPositions = 0
-    global.activePositions = 0
-    global.totalVolumeDeposited = ZERO_BI
-    global.totalVolumeBorrowed = ZERO_BI
-    global.totalVolumeRepaid = ZERO_BI
-    global.totalLiquidations = 0
-    global.currentTVL = ZERO_BI
-    global.currentBorrowed = ZERO_BI
-    global.allTimeHighTVL = ZERO_BI
-    global.allTimeHighBorrowed = ZERO_BI
-    global.totalETHDeposited = ZERO_BI
-    global.totalUSDCDeposited = ZERO_BI
-    global.totalDAIDeposited = ZERO_BI
-  }
-
-  if (action == "newUser") {
-    global.totalUsers = global.totalUsers + 1
-  } else if (action == "newPosition") {
-    global.totalPositions = global.totalPositions + 1
-    global.activePositions = global.activePositions + 1
-  }
-
-  global.updatedAt = timestamp
-  global.save()
-}
 
 function createTransaction(
   position: Position,
@@ -122,7 +50,7 @@ function createTransaction(
 }
 
 export function handleBorrowed(event: Borrowed): void {
-  let user = getOrCreateUser(event.params.user.toHexString(), event.block.timestamp)
+  let user = getOrCreateUser(event.params.user.toHexString().toLowerCase(), event.block.timestamp)
   let position = getOrCreatePosition(user.id, event.block.timestamp)
 
   // Check if this is the first borrow (new active position)
@@ -177,7 +105,7 @@ export function handleBorrowed(event: Borrowed): void {
 }
 
 export function handleRepaid(event: Repaid): void {
-  let user = getOrCreateUser(event.params.user.toHexString(), event.block.timestamp)
+  let user = getOrCreateUser(event.params.user.toHexString().toLowerCase(), event.block.timestamp)
   let position = getOrCreatePosition(user.id, event.block.timestamp)
 
   // Update position
@@ -236,7 +164,7 @@ export function handleRepaid(event: Repaid): void {
 }
 
 export function handleLiquidated(event: Liquidated): void {
-  let user = getOrCreateUser(event.params.user.toHexString(), event.block.timestamp)
+  let user = getOrCreateUser(event.params.user.toHexString().toLowerCase(), event.block.timestamp)
   let position = getOrCreatePosition(user.id, event.block.timestamp)
 
   // Update position
@@ -300,6 +228,6 @@ export function handleLiquidated(event: Liquidated): void {
     event.block.timestamp,
     event.params.debtRepaid,
     user.id,
-    event.params.liquidator.toHexString()
+    event.params.liquidator.toHexString().toLowerCase()
   )
 }
