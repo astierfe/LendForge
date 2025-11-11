@@ -1,145 +1,109 @@
-# LendForge v2.0
+# LendForge v6.1.0
 
-**ETH-Native Decentralized Lending Platform with Multi-Collateral Support**
+**Multi-Collateral DeFi Lending Protocol with Automated Liquidations**
 
 ---
 
 ## Overview
 
-LendForge v2.0 is a DeFi lending protocol enabling users to:
-- **Borrow ETH instantly** against multi-asset collateral (ETH, USDC, DAI)
-- Benefit from **dual-source oracle** pricing with automatic fallback (Chainlink + Uniswap V3 TWAP)
-- Participate in **automated liquidation** mechanisms with profitability calculations
-- Access **real-time analytics** via The Graph subgraph
+LendForge is a complete DeFi lending platform enabling users to:
+- **Borrow ETH** against multi-asset collateral (ETH, USDC, DAI)
+- **Dual-source oracle** pricing with automatic fallback (Chainlink + Uniswap V3 TWAP)
+- **Automated liquidations** via Python bot with profitability calculations
+- **Real-time analytics** via The Graph subgraph + Next.js dashboard
 
-The platform combines on-chain smart contracts (Solidity/Foundry) with a Python backend for monitoring and liquidations.
-
----
-
-## Architecture
-
-```mermaid
-flowchart TB
- subgraph subGraph0["Core Contracts v2.0"]
-        COLL["CollateralManager<br>ETH + USDC + DAI"]
-        POOL["LendingPool<br>Borrow ETH"]
-  end
- subgraph subGraph1["Price Providers"]
-        CL["ChainlinkPriceProvider<br>ETH/USD Primary"]
-        UNI["MockUniswapFallback<br>ETH Fallback"]
-        USDC["MockUSDCProvider"]
-        DAI["MockDAIProvider"]
-  end
- subgraph subGraph2["Oracle System v3.1"]
-        AGG["OracleAggregator<br>Cache + Deviation Checks"]
-        REG["PriceRegistry<br>Asset Routing"]
-        subGraph1
-  end
- subgraph subGraph3["Blockchain - Sepolia Testnet"]
-        subGraph0
-        subGraph2
-  end
- subgraph subGraph4["Backend Services"]
-        BOT["Python Liquidation Bot<br>Real-time Monitoring"]
-        GRAPH["The Graph Subgraph v3.0<br>Multi-Collateral Events"]
-  end
-    POOL -- getPrice --> AGG
-    AGG -- routing --> REG
-    REG -- ETH --> CL
-    REG -- ETH fallback --> UNI
-    REG -- USDC --> USDC
-    REG -- DAI --> DAI
-    BOT -- monitor HF --> POOL
-    GRAPH -- index events --> POOL
-    GRAPH -- index events --> COLL
-    style POOL fill:#f1faee
-    style CL fill:#FFD700
-    style AGG fill:#90EE90,stroke:#00C853
-    style REG fill:#90EE90,stroke:#00C853
-    style subGraph1 fill:#BBDEFB,stroke:#2962FF
-    style subGraph0 color:#FFF9C4
-    style subGraph2 fill:#FFE0B2,stroke:#757575
-    style BOT fill:#e63946,color:#FFFFFF
-    style subGraph3 stroke:#000000,fill:#FFE0B2
-    style subGraph4 fill:#757575,color:#FFFFFF,stroke:#000000
-```
+**Stack:** Solidity/Foundry → TheGraph → Next.js 15 + Python Bot
 
 ---
 
 ## Project Status
 
-**Current Version:** v2.0 ETH-Native
-**Status:** Production-ready on Sepolia, bot monitoring active
+**Version:** v6.1.0 (Iteration 1 Complete)
 **Network:** Sepolia Testnet
+**Status:** Testnet operational, ready for Iteration 2
 
-### ✅ Completed (v2.0)
-- ✅ **ETH-Native Architecture** - Borrow ETH against collateral
-- ✅ **Dual-source oracle system** (Chainlink + Uniswap V3 TWAP)
-- ✅ **Oracle fallback on deviation >5%** (v3.1)
-- ✅ **Price registry** with automatic fallback routing
-- ✅ **Oracle aggregator** with cache & deviation detection
-- ✅ **Multi-collateral support** (ETH, USDC, DAI)
-- ✅ **CollateralManager** for multi-asset tracking with LTV enforcement
-- ✅ **LendingPool v3.0** with health factor & liquidations
-- ✅ **Python liquidation bot** with profitability calculations
-- ✅ **The Graph subgraph v3.0** for multi-collateral indexing
+### ✅ Iteration 1 Completed (v6.1.0)
 
-### 🚧 In Progress (Phase 2.5)
-- ⏳ Frontend dashboard (Next.js)
-- ⏳ Complete unit test coverage for LendingPool
-- ⏳ Production deployment checklist
+**Smart Contracts (Solidity/Foundry):**
+- ✅ Multi-collateral support (ETH, USDC, DAI) with asset-specific LTV ratios
+- ✅ ETH-native borrowing with health factor validation
+- ✅ Dual-source oracle (Chainlink primary, Uniswap TWAP fallback <5% deviation)
+- ✅ 271+ tests (unit + integration), >90% coverage
+
+**Subgraph (TheGraph v6.1.0):**
+- ✅ Multi-collateral event indexing (deposits, borrows, repays, liquidations)
+- ✅ Position lifecycle tracking (INACTIVE → ACTIVE → REPAID/LIQUIDATED)
+- ✅ Global metrics (TVL, utilization, active positions)
+- ✅ Daily historical metrics for analytics
+
+**Frontend (Next.js 15 + React 19):**
+- ✅ Dashboard (TVL overview, user position, health factor, quick actions)
+- ✅ Deposit flow (ETH/USDC/DAI, approval flow, position preview)
+- ✅ Borrow flow (amount input, HF simulation, interest rate display)
+- ✅ Repay & Withdraw flows (HF safety checks, max buttons, asset selector)
+- ✅ Analytics page (TVL charts, utilization gauge, recent activity, oracle prices)
+- ✅ Positions page (historical positions, transaction history, filters)
+- ✅ RainbowKit wallet integration (Sepolia support)
+
+**Python Bot:**
+- ✅ Health factor monitoring (30s intervals)
+- ✅ Automated liquidations with gas profitability checks
+- ✅ Multi-asset support (ETH, USDC, DAI)
+- ✅ Flask API for status monitoring
+
+**Bug Fixes (v6.1.0):**
+- ✅ ANO_009 RESOLVED: Cross-user data contamination (subgraph helpers + cache disabled)
+- ✅ Oracle price integration: USDC/DAI fetched from OracleAggregator (not hardcoded $1.00)
+- ✅ PositionsTable: Borrowed amount display fixed (Wei → ETH)
+- ✅ Documentation: JSON format created (KNOWN_ISSUES_ANO.json)
+
+### 🎯 Iteration 2 Roadmap
+
+**Oracle Improvements (Primary Focus):**
+
+**EVO_001 - Real Price Injection System (2-3 weeks):**
+- 📊 Fetch mainnet prices (Chainlink + Uniswap V3) via Python collector
+- 💾 Store historical data in SQLite (24h-7d granularity)
+- ⚙️ Inject into Sepolia mocks via Foundry automation (`cast send`)
+- ⏰ Cron job updates every 5-10 minutes
+- ✅ Enable realistic volatility testing, deviation scenarios, emergency mode triggers
+
+**EVO_003 - UniswapV3 Oracle Deployment (1-2 weeks):**
+- 🔧 Deploy real UniswapV3PriceProvider contracts (code ready, 225+ tests passing)
+- 🏊 Configure 30-minute TWAP windows on liquid pools
+- 🔀 Register as fallback providers in PriceRegistry
+- 🚨 Test deviation-based fallback (>5% triggers TWAP instead of Chainlink)
+
+**Estimated Duration:** 3-5 weeks total
+
+**Why EVO_001/003 (not EVO_002):**
+- Production readiness: Real oracle data required for demos & mainnet
+- Quick wins: Oracle improvements = 3-5 weeks vs Multi-positions = 4-5 weeks
+- Testnet realism: Mock prices ($0.60 USDC) currently unrealistic
+
+**Phase 6C/6D - Contract Fixes (Deferred):**
+- Testnet acceptable with ANO_008 workaround (`scripts/transfer_liquidated_collateral.sh`)
+- Contract fixes planned for pre-production only (if mainnet launch)
 
 ---
 
-## Tech Stack
+## Architecture
 
-### Smart Contracts
-- **Solidity** 0.8.24 + **Foundry**
-- **Libraries:** OpenZeppelin 4.9.6, Chainlink, Uniswap V3
-- **Tests:** 225+ unit tests + 46 integration tests
-- **Coverage:** >90%
+**On-chain (Sepolia Testnet):**
+- LendingPool v3.0 - Borrow/Repay/Liquidate operations
+- CollateralManager v1.1 - Multi-asset deposits (ETH + ERC20)
+- OracleAggregator v3.1 - Price aggregation with deviation checks
+- PriceRegistry v1.1 - Asset routing to price providers
 
-### Backend
-- **Python** 3.11+ (FastAPI)
-- **Web3.py** for blockchain interaction
-- **The Graph** for event indexing
+**Off-chain Services:**
+- TheGraph Subgraph - Event indexing (positions, metrics, transactions)
+- Python Bot - Automated liquidation monitoring
+- Next.js Frontend - User interface with wagmi/RainbowKit
 
-### Oracle System (v3.1 - Completed)
-- **ChainlinkPriceProvider:** ETH/USD primary source
-- **UniswapV3TWAPLibrary:** Fallback pricing (production-ready)
-- **MockProviders:** USDC/DAI (Sepolia feeds unreliable)
-- **Deviation checks:** 5% warning, 10% emergency mode
-- **Automatic fallback:** Uses TWAP when deviation exceeds threshold
-- **Cache:** 5-minute duration per asset
-
----
-
-## Key Features
-
-### Dual-Source Oracle with Automatic Fallback ✅
-Chainlink primary + Uniswap V3 TWAP fallback with automatic switching based on price deviation:
-- Deviation < 5%: Use Chainlink (normal operation)
-- Deviation 5-10%: Use Uniswap TWAP + emit warning
-- Deviation > 10%: Use Uniswap TWAP + activate emergency mode
-
-### ETH-Native Borrowing ✅
-Borrow ETH instantly against multi-asset collateral:
-- **Borrow:** ETH transferred directly to user
-- **Repay:** Send ETH to repay debt (partial or full)
-- **Liquidate:** Pay ETH to seize under-collateralized positions
-- **Decimals:** All amounts in wei (18 decimals)
-
-### Multi-Collateral Support ✅
-Deposit multiple assets as collateral with asset-specific LTV ratios:
-- **ETH:** 66% LTV, 83% liquidation threshold, 10% liquidation bonus
-- **USDC:** 90% LTV, 95% liquidation threshold, 5% liquidation bonus
-- **DAI:** 90% LTV, 95% liquidation threshold, 5% liquidation bonus
-
-### Automated Liquidations ✅
-Python bot monitors positions every 30s, calculates profitability including gas, and executes liquidations automatically.
-
-### Real-Time Indexing ✅
-The Graph subgraph v3.0 provides instant access to TVL, user positions, collateral breakdown, and liquidation history via GraphQL.
+**Price Providers:**
+- Chainlink ETH/USD (primary)
+- MockUniswapV3 (fallback - Sepolia)
+- MockUSDC/DAI providers ($0.60/$1.00 - Sepolia testing)
 
 ---
 
@@ -147,16 +111,96 @@ The Graph subgraph v3.0 provides instant access to TVL, user positions, collater
 
 | Contract | Address | Version |
 |----------|---------|---------|
-| **LendingPool** | `0x06AF08708B45968492078A1900124DaA832082cD` | **v3.0 ETH-Native** |
+| **LendingPool** | `0x06AF08708B45968492078A1900124DaA832082cD` | v3.0 |
 | **CollateralManager** | `0x53Ea723AA0C4cd5eF459eE9351D3f9875D821758` | v1.1 |
 | **OracleAggregator** | `0x62f41B1EDc66bC46e05c34AC40B447E5A7ab3EAe` | v3.1 |
 | **PriceRegistry** | `0x43BcA40deF9Ec42469b6dE95dCBfa38d58584aED` | v1.1 |
 
-**Collateral Tokens:**
+**Collateral Assets:**
 - USDC: `0xC47095AD18C67FBa7E46D56BDBB014901f3e327b`
 - DAI: `0x2FA332E8337642891885453Fd40a7a7Bb010B71a`
 
-**Chainlink Feed (ETH/USD):** `0x694AA1769357215DE4FAC081bf1f309aDC325306`
+**Subgraph:** https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
+
+---
+
+## Quick Start
+
+### Prerequisites
+```bash
+# Foundry
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+
+# Node.js 18+
+node -v
+
+# Python 3.11+
+python --version
+```
+
+### Smart Contracts
+```bash
+forge install
+forge build
+forge test                          # 271+ tests
+```
+
+### Subgraph
+```bash
+cd subgraph
+npm install
+npm run codegen && npm run build
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev                         # http://localhost:3000
+```
+
+### Bot
+```bash
+cd bot
+python -m venv venv
+source venv/bin/activate           # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+python src/main.py
+```
+
+---
+
+## Key Features
+
+### Multi-Collateral Support
+Deposit ETH, USDC, or DAI as collateral with asset-specific LTV ratios:
+- **ETH:** 66% LTV, 83% liquidation threshold
+- **USDC:** 90% LTV, 95% liquidation threshold
+- **DAI:** 90% LTV, 95% liquidation threshold
+
+### Health Factor System
+Real-time health factor monitoring prevents undercollateralization:
+- **HF > 1.5:** Safe (green)
+- **HF 1.2-1.5:** Warning (yellow)
+- **HF 1.0-1.2:** At-risk (orange)
+- **HF < 1.0:** Liquidatable (red)
+
+Formula: `HF = (Collateral Value × Liquidation Threshold) / Borrowed Value`
+
+### Dual-Source Oracle
+Automatic failover when price deviation exceeds threshold:
+- **< 5%:** Use Chainlink (normal)
+- **5-10%:** Use Uniswap TWAP + warning
+- **> 10%:** Use Uniswap TWAP + emergency mode
+
+### Automated Liquidations
+Python bot monitors positions every 30s:
+- Detects HF < 1.0 positions
+- Calculates liquidation profitability (including gas)
+- Executes profitable liquidations automatically
+- Displays warnings for unprofitable liquidations
 
 ---
 
@@ -164,149 +208,153 @@ The Graph subgraph v3.0 provides instant access to TVL, user positions, collater
 
 ```
 LendForge/
-├── contracts/
-│   ├── oracles/            # Oracle system v3.1
-│   │   ├── OracleAggregator.sol      # v3.1 with fallback
-│   │   ├── PriceRegistry.sol
-│   │   ├── ChainlinkPriceProvider.sol
-│   │   ├── UniswapV3PriceProvider.sol
-│   │   └── mocks/          # Mock providers for Sepolia
-│   ├── CollateralManager.sol         # Multi-asset support
-│   ├── LendingPool.sol              # v3.0 ETH-native
-│   ├── libraries/          # HealthCalculator, DataTypes
-│   └── interfaces/         # IPriceProvider, ILendingPool
-├── test/
-│   ├── unit/               # 225+ unit tests
-│   └── integration/        # 46 E2E tests
-├── script/                 # Deployment scripts
-│   └── DeployFullStackV3.s.sol      # Complete deployment
-├── subgraph/               # The Graph v3.0 indexing
-├── bot/                    # Python liquidation bot
-└── _docs/                  # Technical specifications
+├── contracts/              # Solidity smart contracts
+│   ├── oracles/           # Oracle system v3.1
+│   ├── CollateralManager.sol
+│   ├── LendingPool.sol
+│   └── libraries/         # Shared utilities
+├── test/                  # 271+ unit + integration tests
+├── script/                # Deployment scripts
+├── subgraph/              # TheGraph indexing
+│   ├── schema.graphql     # Entity definitions
+│   └── src/               # Event handlers
+├── frontend/              # Next.js 15 dashboard
+│   ├── app/               # Pages (App Router)
+│   ├── components/        # UI components
+│   ├── hooks/             # Custom hooks
+│   └── lib/               # Utilities (GraphQL, wagmi)
+├── bot/                   # Python liquidation bot
+│   └── src/               # Bot logic
+└── _docs/                 # Documentation
+    ├── KNOWN_ISSUES_ANO.json  # Machine-readable bugs
+    └── issues/            # Detailed issue specs
 ```
 
 ---
 
-## Quick Start
+## Tech Stack
+
+**Smart Contracts:**
+- Solidity 0.8.24 + Foundry
+- OpenZeppelin 4.9.6
+- Chainlink, Uniswap V3
+
+**Subgraph:**
+- TheGraph (AssemblyScript)
+- GraphQL queries
+
+**Frontend:**
+- Next.js 15 (App Router)
+- React 19 + TypeScript
+- wagmi v2 + RainbowKit v2
+- Apollo Client (GraphQL)
+- Recharts (analytics)
+- Tailwind CSS + shadcn/ui
+
+**Bot:**
+- Python 3.11+
+- web3.py
+- APScheduler
+- Flask API
+
+---
+
+## Known Issues
+
+See [_docs/KNOWN_ISSUES_ANO.json](_docs/KNOWN_ISSUES_ANO.json) for machine-readable issue list.
+
+**Active Bugs (require contract fixes):**
+- **ANO_006:** Missing pool liquidity validation → borrow() reverts with generic error
+- **ANO_008:** Liquidation missing collateral transfer → blocks production
+
+**Mitigated (workarounds in place):**
+- **ANO_001:** GlobalMetric.activePositions always 0 → client-side counting
+- **ANO_002:** Asset decimals hardcoded 18 → ASSET_DECIMALS mapping override
+- **ANO_003:** UserCollateral.valueUSD stores total → calculate per-asset
+- **ANO_004:** currentTVL adds mixed decimals → manual calculation with correct parsing
+- **ANO_005:** DailyMetric missing ETH price → pass current price for history
+
+**Resolved:**
+- **ANO_009:** Cross-user data contamination (v6.1.0 fix)
+
+---
+
+## Testing
 
 ### Smart Contracts
 ```bash
-forge install
-forge build
-forge test                          # Run 271+ tests
-forge test --match-contract LendingPool # Test lending pool only
-forge script script/DeployFullStackV3.s.sol --rpc-url sepolia --broadcast --verify
+forge test                           # All tests
+forge test --match-contract LendingPoolTest
+forge test --match-test testBorrowSuccess -vvv
+forge coverage                       # >90% coverage
 ```
 
-### Backend Bot
+### Frontend
+Manual testing workflow:
+1. Connect wallet (DEPLOYER or USER)
+2. Deposit collateral → verify TVL updates
+3. Borrow ETH → verify HF calculation
+4. Check /positions → should show only connected user's data
+5. Switch wallet → verify no data mixing
+
+### Bot
 ```bash
 cd bot
-python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env with your RPC URL and private key
-python src/main.py
+python -m pytest tests/ -v
 ```
-
-### Subgraph
-```bash
-cd subgraph
-npm install && npm run codegen && npm run build
-graph deploy --studio lendforge-v3
-```
-
----
-
-## Test Coverage
-
-| Component | Unit Tests | Integration | Coverage |
-|-----------|-----------|-------------|----------|
-| Oracle Providers | 70+ | 16 | >95% |
-| PriceRegistry | 45 | - | >90% |
-| OracleAggregator | 64 | - | >90% |
-| CollateralManager | 50 | - | >85% |
-| LendingPool | 55 | 30 | >85% |
-| **Total** | **225+** | **46** | **>90%** |
-
----
-
-## Security
-
-- ✅ Dual-source oracle with automatic fallback
-- ✅ Emergency mode on critical deviations (>10%)
-- ✅ Circuit breakers for extreme volatility
-- ✅ Comprehensive test suite (>90% coverage)
-- ✅ OpenZeppelin + Chainlink audited dependencies
-- ✅ Health factor monitoring with liquidation bot
-
-**Testnet Limitations:** Mock providers used for USDC/DAI/Uniswap due to unreliable Sepolia feeds. Production deployment on mainnet will use real Chainlink feeds and liquid Uniswap pools.
-
----
-
-## Oracle Fallback Strategy
-
-### Deviation-Based Decision Tree
-
-```
-Price Request
-    ↓
-Get Chainlink (Primary)
-    ↓
-Get Uniswap TWAP (Fallback)
-    ↓
-Calculate Deviation
-    ↓
-    ├─ < 5% → Use Chainlink (normal)
-    ├─ 5-10% → Use TWAP + emit warning
-    └─ > 10% → Use TWAP + emergency mode
-```
-
-### Real-World Scenarios
-
-**Flash Crash Protection:**
-- ETH drops $3000 → $1800 in 10 min
-- Chainlink updates immediately
-- Uniswap TWAP (30min) shows $2400
-- Deviation 25% → System uses TWAP
-- Result: Users protected from panic liquidations
-
-**Manipulation Protection:**
-- Attacker buys $5M ETH in 1 block
-- Uniswap spot spikes to $3500
-- TWAP smooths to $2050 over 30min
-- Chainlink shows $2000
-- Deviation 2.5% → System uses Chainlink
-- Result: Attack neutralized (cost >$500K)
-
----
-
-## Roadmap
-
-### Phase 1-2 ✅ (Completed)
-Oracle system v3.1 with fallback, multi-collateral support, ETH-native architecture
-
-### Phase 2.5 🚧 (In Progress - 2-3 weeks)
-- Complete unit test coverage (LendingPool borrow/repay/liquidate)
-- Frontend dashboard (Next.js)
-- Production deployment checklist
-- Mainnet deployment preparation
-
-### Phase 3 (Future)
-- Additional collateral types (WBTC, blue-chip tokens)
-- NFT collateral (whitelist-based)
-- Governance (DAO)
-- Multi-chain deployment
 
 ---
 
 ## Documentation
 
-Detailed specifications available in `_docs/`:
-- `spec_lending_pool_updated.md` - Complete v2.0 technical specification
-- `bugs_identified.md` - Known issues and resolutions
+**Machine-readable:**
+- [CLAUDE.md](CLAUDE.md) - Claude Code guide
+- [_docs/KNOWN_ISSUES_ANO.json](_docs/KNOWN_ISSUES_ANO.json) - Bugs/anomalies index
+- [_docs/issues/ANO_*.json](_docs/issues/) - Detailed issue specs
+
+**Human-readable:**
+- [ROADMAP.md](ROADMAP.md) - Development roadmap
+- [_docs/KNOWN_ISSUES.md](_docs/KNOWN_ISSUES.md) - Issue summaries
+- [_docs/issues/ANO_*.md](_docs/issues/) - Detailed issue docs
+
+---
+
+## Security
+
+⚠️ **Testnet Only - Not Production Ready**
+
+**Current Status:**
+- Sepolia testnet deployment
+- Mock oracles for USDC/DAI (unreliable Sepolia feeds)
+- Known contract bugs (ANO_006, ANO_008) require fixes before mainnet
+
+**Pre-Production Requirements:**
+- Security audit (Certora/OpenZeppelin)
+- Fix ANO_006 (liquidity validation)
+- Fix ANO_008 (liquidation collateral transfer)
+- Deploy real Chainlink feeds + liquid Uniswap pools
+- Mainnet stress testing
 
 ---
 
 ## License
 
 MIT
+
+---
+
+## Contributing
+
+Contributions welcome! Please:
+1. Check [_docs/KNOWN_ISSUES_ANO.json](_docs/KNOWN_ISSUES_ANO.json) for existing bugs
+2. Read [CLAUDE.md](CLAUDE.md) for architecture patterns
+3. Follow existing code style (Prettier for frontend, Forge fmt for contracts)
+4. Write tests for new features
+
+---
+
+## Contact
+
+- GitHub Issues: Bug reports and feature requests
+- Documentation: See `_docs/` for technical specs
+

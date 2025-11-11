@@ -161,6 +161,114 @@ export function calculateLTV(
 }
 
 /**
+ * Calculate weighted LTV from on-chain collateral data
+ *
+ * Formula: Σ(collateral_value_USD × asset_LTV) for all assets
+ *
+ * @param collateralData - From getUserCollaterals() [assets, amounts, valuesUSD]
+ * @param assetConfigs - Map of asset address (lowercase) → AssetConfig (from useAssetConfigs)
+ * @returns Total weighted LTV in USD (max borrowable amount)
+ */
+export function calculateWeightedLTV(
+  collateralData: readonly [readonly `0x${string}`[], readonly bigint[], readonly bigint[]] | undefined | null,
+  assetConfigs: Record<string, { decimals: number; priceUSD: number; ltv: number }>
+): number {
+  if (!collateralData) return 0;
+
+  const [assets, amounts] = collateralData;
+
+  if (!assets || !amounts || assets.length === 0) return 0;
+
+  let totalWeightedLTV = 0;
+
+  console.log('[calculateWeightedLTV] assetConfigs:', assetConfigs);
+  for (let i = 0; i < assets.length; i++) {
+    const assetAddress = assets[i].toLowerCase();
+    const config = assetConfigs[assetAddress];
+
+    if (!config) {
+      console.warn(`[calculateWeightedLTV] Unknown asset: ${assetAddress}`);
+      console.warn(`[calculateWeightedLTV] Available configs:`, Object.keys(assetConfigs));
+      continue;
+    }
+
+    // Parse amount with correct decimals
+    const amount = Number(amounts[i]) / Math.pow(10, config.decimals);
+    const valueUSD = amount * config.priceUSD;
+    const ltvDecimal = config.ltv / 100; // Convert percentage to decimal (66 → 0.66)
+
+    console.log(`[calculateWeightedLTV] Asset ${i}:`, {
+      address: assetAddress,
+      amount,
+      priceUSD: config.priceUSD,
+      valueUSD,
+      ltvPercent: config.ltv,
+      ltvDecimal,
+      contribution: valueUSD * ltvDecimal
+    });
+
+    totalWeightedLTV += valueUSD * ltvDecimal;
+  }
+
+  console.log('[calculateWeightedLTV] TOTAL:', totalWeightedLTV);
+  return totalWeightedLTV;
+}
+
+/**
+ * Calculate weighted liquidation threshold from on-chain collateral data
+ *
+ * Formula: Σ(collateral_value_USD × asset_liquidation_threshold) for all assets
+ *
+ * @param collateralData - From getUserCollaterals() [assets, amounts, valuesUSD]
+ * @param assetConfigs - Map of asset address (lowercase) → AssetConfig (from useAssetConfigs)
+ * @returns Total weighted liquidation threshold in USD
+ */
+export function calculateWeightedLiquidationThreshold(
+  collateralData: readonly [readonly `0x${string}`[], readonly bigint[], readonly bigint[]] | undefined | null,
+  assetConfigs: Record<string, { decimals: number; priceUSD: number; liquidationThreshold: number }>
+): number {
+  if (!collateralData) return 0;
+
+  const [assets, amounts] = collateralData;
+
+  if (!assets || !amounts || assets.length === 0) return 0;
+
+  let totalWeightedThreshold = 0;
+
+  console.log('[calculateWeightedLiquidationThreshold] assetConfigs:', assetConfigs);
+  for (let i = 0; i < assets.length; i++) {
+    const assetAddress = assets[i].toLowerCase();
+    const config = assetConfigs[assetAddress];
+
+    if (!config) {
+      console.warn(`[calculateWeightedLiquidationThreshold] Unknown asset: ${assetAddress}`);
+      console.warn(`[calculateWeightedLiquidationThreshold] Available configs:`, Object.keys(assetConfigs));
+      continue;
+    }
+
+    // Parse amount with correct decimals
+    const amount = Number(amounts[i]) / Math.pow(10, config.decimals);
+    const valueUSD = amount * config.priceUSD;
+    const thresholdDecimal = config.liquidationThreshold / 100; // Convert percentage to decimal (83 → 0.83)
+
+    console.log(`[calculateWeightedLiquidationThreshold] Asset ${i}:`, {
+      address: assetAddress,
+      amount,
+      priceUSD: config.priceUSD,
+      valueUSD,
+      thresholdPercent: config.liquidationThreshold,
+      thresholdDecimal,
+      contribution: valueUSD * thresholdDecimal
+    });
+
+    totalWeightedThreshold += valueUSD * thresholdDecimal;
+  }
+
+  console.log('[calculateWeightedLiquidationThreshold] TOTAL:', totalWeightedThreshold);
+  return totalWeightedThreshold;
+}
+
+/**
  * Position data structure (on-chain sources only)
  */
 export interface OnChainPosition {

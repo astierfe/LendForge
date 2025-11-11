@@ -3,13 +3,20 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingDown, AlertCircle, ArrowRight } from "lucide-react";
+import { useAccount, useReadContract } from "wagmi";
 import { useUserPosition } from "@/hooks/useUserPosition";
-import { calculateMaxBorrowable } from "@/hooks/useHealthFactor";
 import { useOnChainPosition } from "@/hooks/useOnChainPosition";
+import { useAssetConfigs } from "@/lib/utils/assetConfig";
+import { calculateWeightedLTV, POSITION_READ_ABIS } from "@/lib/utils/position";
+import { CONTRACTS } from "@/lib/contracts/addresses";
 import Link from "next/link";
 
 /**
  * UserPositionCard - Displays user's borrowing position
+ *
+ * REFACTORED v6.1.1: Now uses 100% on-chain data for available borrow calculation
+ * - useAssetConfigs() for LTV, prices (from contracts)
+ * - calculateWeightedLTV() utility for max borrowable
  *
  * Shows:
  * - Total borrowed (ETH)
@@ -20,6 +27,7 @@ import Link from "next/link";
  * Data source: useOnChainPosition (centralized on-chain data)
  */
 export function UserPositionCard() {
+  const { address } = useAccount();
   const { data: user } = useUserPosition();
 
   // Get all position data from centralized hook (single source of truth)
@@ -33,6 +41,21 @@ export function UserPositionCard() {
     ltvPercent: ltvUsed,
     hasActiveBorrow,
   } = position;
+
+  // Get collateral data from contract
+  const { data: collateralData } = useReadContract({
+    address: CONTRACTS.COLLATERAL_MANAGER,
+    abi: POSITION_READ_ABIS.GET_USER_COLLATERALS,
+    functionName: "getUserCollaterals",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: 5000,
+    },
+  });
+
+  // Get asset configs from contracts (LTV, prices)
+  const { configs: assetConfigs } = useAssetConfigs(collateralData?.[0]);
 
   // Debug: Log to verify data
   console.log('[UserPositionCard] ON-CHAIN POSITION:', position);
@@ -66,16 +89,12 @@ export function UserPositionCard() {
     );
   }
 
-  // Calculate max borrowable and available to borrow
-  // Note: Still using subgraph user.collaterals for LTV ratios until we fetch them on-chain
-  const maxBorrowableUSD = calculateMaxBorrowable(
-    user.totalCollateralUSD,
-    user.totalBorrowed,
-    user.collaterals,
-    ETH_PRICE // Pass ETH price from oracle
-  );
+  // Calculate max borrowable and available to borrow using on-chain asset configs
+  const maxBorrowableUSD = collateralData && Object.keys(assetConfigs).length > 0
+    ? calculateWeightedLTV(collateralData, assetConfigs)
+    : 0;
   const availableToBorrowUSD = Math.max(0, maxBorrowableUSD - totalBorrowedUSD);
-  const availableToBorrowETH = availableToBorrowUSD / ETH_PRICE;
+  const availableToBorrowETH = ETH_PRICE > 0 ? availableToBorrowUSD / ETH_PRICE : 0;
 
   // Determine if user is approaching max LTV (warning at 80%+ of max)
   const ltvWarningThreshold = 80;

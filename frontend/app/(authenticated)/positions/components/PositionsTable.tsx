@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, ExternalLink, Activity, CheckCircle2, XCircl
 import { Position } from "@/hooks/useUserPositions";
 import { formatters } from "@/hooks/useUserPosition";
 import { format } from "date-fns";
+import { GLOBAL_LIQUIDATION_THRESHOLD } from "@/lib/contracts/config";
 
 interface PositionsTableProps {
   positions: Position[];
@@ -14,6 +15,7 @@ interface PositionsTableProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   isLoading: boolean;
+  ethPriceUSD: number;
 }
 
 /**
@@ -29,6 +31,11 @@ interface PositionsTableProps {
  * - Pagination controls
  * - Etherscan links
  * - Responsive design
+ * - Real-time HF calculation for ACTIVE positions (subgraph HF may be stale)
+ *
+ * IMPORTANT: For ACTIVE positions, HF is calculated using GLOBAL_LIQUIDATION_THRESHOLD
+ * to match the contract's HealthCalculator logic (contracts/libraries/HealthCalculator.sol).
+ * This ensures consistency with Dashboard display and contract behavior.
  */
 export function PositionsTable({
   positions,
@@ -36,6 +43,7 @@ export function PositionsTable({
   totalPages,
   onPageChange,
   isLoading,
+  ethPriceUSD,
 }: PositionsTableProps) {
   // Helper to format USD values
   const formatUSD = (usdBigInt: string): string => {
@@ -48,9 +56,40 @@ export function PositionsTable({
     }).format(usd);
   };
 
+  /**
+   * Calculate real-time health factor for ACTIVE positions
+   * Uses GLOBAL_LIQUIDATION_THRESHOLD (83%) to match contract logic
+   * Formula: HF = (collateralUSD × 0.83) / borrowedUSD
+   */
+  const calculateHealthFactor = (position: Position): string => {
+    // For non-ACTIVE positions, use subgraph HF (historical, accurate at time of event)
+    if (position.status !== "ACTIVE") {
+      return position.healthFactor;
+    }
+
+    // For ACTIVE positions, calculate HF using contract formula
+    const borrowedWei = BigInt(position.borrowed);
+    if (borrowedWei === BigInt(0)) {
+      return "999.99"; // No debt = infinite HF
+    }
+
+    // Convert BigInt values to numbers (safe for USD amounts < 2^53)
+    const collateralUSD = Number(position.totalCollateralUSD) / 1e8; // Assuming 8 decimals
+    const borrowedETH = Number(borrowedWei) / 1e18; // 18 decimals for ETH
+
+    // Use real-time ETH price from oracle (passed as prop from parent)
+    const borrowedUSD = borrowedETH * ethPriceUSD;
+
+    // Apply global liquidation threshold (matches contract)
+    const adjustedCollateral = collateralUSD * GLOBAL_LIQUIDATION_THRESHOLD;
+    const healthFactor = adjustedCollateral / borrowedUSD;
+
+    return healthFactor.toFixed(2);
+  };
+
   // Helper to format health factor with color
-  const formatHealthFactor = (hf: string) => {
-    const value = parseFloat(hf);
+  const formatHealthFactor = (hfString: string) => {
+    const value = parseFloat(hfString);
 
     // Handle no debt case (health factor = max value)
     if (value > 1000) {
@@ -137,7 +176,7 @@ export function PositionsTable({
             <TableRow>
               <TableHead>Position ID</TableHead>
               <TableHead className="text-right">Collateral (USD)</TableHead>
-              <TableHead className="text-right">Borrowed (USDC)</TableHead>
+              <TableHead className="text-right">Borrowed (ETH)</TableHead>
               <TableHead className="text-right">Health Factor</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
@@ -147,7 +186,9 @@ export function PositionsTable({
           </TableHeader>
           <TableBody>
             {positions.map((position) => {
-              const hf = formatHealthFactor(position.healthFactor);
+              // Calculate real-time HF for ACTIVE positions, use subgraph HF for historical
+              const calculatedHF = calculateHealthFactor(position);
+              const hf = formatHealthFactor(calculatedHF);
               const positionId = position.id.split("-")[1]?.slice(0, 8) || position.id.slice(0, 8);
 
               return (
@@ -174,9 +215,9 @@ export function PositionsTable({
 
                   {/* Borrowed */}
                   <TableCell className="text-right">
-                    {formatters.usdToNumber(position.borrowed) === 0
+                    {formatters.weiToEth(position.borrowed) === 0
                       ? "-"
-                      : formatUSD(position.borrowed)}
+                      : `${formatters.weiToEth(position.borrowed).toFixed(4)} ETH`}
                   </TableCell>
 
                   {/* Health Factor */}

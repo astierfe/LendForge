@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReadContract } from "wagmi";
-import { formatUnits } from "viem";
-import { useUserPosition, formatters } from "./useUserPosition";
+import { useAccount, useReadContract } from "wagmi";
 import { useOnChainPosition } from "./useOnChainPosition";
-import { CONTRACTS, TOKENS } from "@/lib/contracts/addresses";
+import { useAssetConfigs } from "@/lib/utils/assetConfig";
+import {
+  POSITION_READ_ABIS,
+} from "@/lib/utils/position";
+import { CONTRACTS } from "@/lib/contracts/addresses";
+import { GLOBAL_LIQUIDATION_THRESHOLD } from "@/lib/contracts/config";
 
 export interface RepaySimulationResult {
   /** Simulated health factor after repay */
@@ -29,6 +32,11 @@ export interface RepaySimulationResult {
 /**
  * Hook to simulate repay operation and calculate health factor impact
  *
+ * REFACTORED v6.1.1: Now uses 100% on-chain data (no subgraph, no hardcoded prices)
+ * - useOnChainPosition() for borrowed amount, collateral, prices
+ * - useAssetConfigs() for liquidation thresholds (from contracts)
+ * - calculateWeightedLiquidationThreshold() utility
+ *
  * Usage:
  * ```tsx
  * const simulation = useRepaySimulation("0.5"); // Repay 0.5 ETH
@@ -43,11 +51,27 @@ export interface RepaySimulationResult {
 export function useRepaySimulation(
   repayAmountETH: string
 ): RepaySimulationResult {
-  const { data: user } = useUserPosition();
+  const { address } = useAccount();
 
-  // Get on-chain position (centralized - includes ETH price)
+  // Get on-chain position (centralized - includes borrowed, collateral, ETH price)
+  // position.collateralUSD already handles ANO_003 workaround (amount × oraclePrice)
   const { position } = useOnChainPosition();
-  const { borrowedETH: currentBorrowedETH, ethPriceUSD } = position;
+  const { borrowedETH: currentBorrowedETH, ethPriceUSD, collateralUSD } = position;
+
+  // Get collateral data from contract
+  const { data: collateralData } = useReadContract({
+    address: CONTRACTS.COLLATERAL_MANAGER,
+    abi: POSITION_READ_ABIS.GET_USER_COLLATERALS,
+    functionName: "getUserCollaterals",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: 5000,
+    },
+  });
+
+  // Get asset configs from contracts (liquidation thresholds)
+  const { configs: assetConfigs, isLoading: configsLoading } = useAssetConfigs(collateralData?.[0]);
 
   const simulation = useMemo((): RepaySimulationResult => {
     // Default empty result
@@ -62,23 +86,34 @@ export function useRepaySimulation(
       estimatedInterestETH: 0,
     };
 
-    // Must have user position
-    if (!user) {
-      return {
-        ...emptyResult,
-        warningMessage: "No position found.",
-      };
-    }
-
     // Must have active borrow (use on-chain data)
     if (currentBorrowedETH === 0) {
       return {
         ...emptyResult,
+        ethPriceUSD,
         warningMessage: "No active borrows to repay.",
       };
     }
 
-    // currentBorrowedETH and ethPriceUSD now come from useOnChainPosition
+    // Must have collateral data (for HF calculation)
+    if (!collateralData || !collateralData[0] || collateralData[0].length === 0) {
+      return {
+        ...emptyResult,
+        ethPriceUSD,
+        currentBorrowedETH,
+        warningMessage: "Unable to load collateral data.",
+      };
+    }
+
+    // Must have asset configs loaded
+    if (configsLoading || Object.keys(assetConfigs).length === 0) {
+      return {
+        ...emptyResult,
+        ethPriceUSD,
+        currentBorrowedETH,
+        warningMessage: "Loading asset configurations...",
+      };
+    }
 
     // No interest accrual in current contract implementation (fixed rate, no time-based accrual)
     // Contract will refund any excess payment (see LendingPool.sol:143-147)
@@ -107,37 +142,14 @@ export function useRepaySimulation(
     const newBorrowedETH = Math.max(0, currentBorrowedETH - repayAmount);
     const newBorrowedUSD = newBorrowedETH * ethPriceUSD;
 
-    // Calculate weighted liquidation threshold for HF calculation
-    // NOTE: col.valueUSD from subgraph is BUGGY (ANO_003: contains total position value, not individual collateral)
-    // Workaround: Calculate valueUSD ourselves using amount * price from oracle
-    let totalCollateralUSD = 0;
-    let totalWeightedLiquidationThreshold = 0;
-
-    if (user.collaterals && user.collaterals.length > 0) {
-      for (const col of user.collaterals) {
-        // Parse amount based on decimals
-        const amount = formatters.tokenToNumber(col.amount, col.asset.decimals, col.asset.symbol);
-
-        // Get price for this asset (use ETH price for ETH, $1 for stablecoins)
-        let assetPriceUSD = 1; // Default for stablecoins (USDC, DAI)
-        if (col.asset.symbol === "ETH") {
-          assetPriceUSD = ethPriceUSD;
-        }
-
-        // Calculate correct valueUSD
-        const colValueUSD = amount * assetPriceUSD;
-        totalCollateralUSD += colValueUSD;
-
-        const colLiqThreshold = col.asset.liquidationThreshold / 100; // Convert percentage to decimal
-        totalWeightedLiquidationThreshold += colValueUSD * colLiqThreshold;
-      }
-    }
-
-    // Calculate simulated health factor
-    // HF = (totalCollateralUSD * liquidationThreshold) / totalBorrowedUSD
+    // Calculate simulated health factor using GLOBAL threshold (matches contract)
+    // Contract formula: HF = (collateralUSD * LIQUIDATION_THRESHOLD) / borrowedUSD
+    // See: contracts/libraries/HealthCalculator.sol line 24-25
+    // Note: collateralUSD from useOnChainPosition already handles ANO_003 workaround
     let simulatedHealthFactor: number | null = null;
     if (newBorrowedUSD > 0) {
-      simulatedHealthFactor = totalWeightedLiquidationThreshold / newBorrowedUSD;
+      const adjustedCollateral = collateralUSD * GLOBAL_LIQUIDATION_THRESHOLD;
+      simulatedHealthFactor = adjustedCollateral / newBorrowedUSD;
     } else {
       simulatedHealthFactor = Infinity; // No debt = infinite HF
     }
@@ -165,7 +177,7 @@ export function useRepaySimulation(
       ethPriceUSD,
       estimatedInterestETH,
     };
-  }, [user, repayAmountETH, currentBorrowedETH, ethPriceUSD]);
+  }, [collateralData, assetConfigs, repayAmountETH, currentBorrowedETH, ethPriceUSD, collateralUSD, configsLoading]);
 
   return simulation;
 }

@@ -151,7 +151,7 @@ export default function BorrowPage() {
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">ETH</span>
-                <Badge variant="outline">80%</Badge>
+                <Badge variant="outline">66%</Badge>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">USDC</span>

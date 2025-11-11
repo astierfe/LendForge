@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useAccount } from 'wagmi';
 import { useUserPositions } from '@/hooks/useUserPositions';
+import { useOnChainPosition } from '@/hooks/useOnChainPosition';
 import { PositionFilters } from './components/PositionFilters';
 import { PositionsTable } from './components/PositionsTable';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -40,6 +41,11 @@ export default function PositionsPage() {
     totalPages,
     setCurrentPage,
   } = useUserPositions(address);
+
+  // Get ETH price for real-time HF calculation (only if user has ACTIVE positions)
+  const hasActivePositions = positions.some((p) => p.status === 'ACTIVE');
+  const { position } = useOnChainPosition();
+  const ethPriceUSD = hasActivePositions ? position.ethPriceUSD : 0;
 
   // Calculate counts for filter badges
   const counts = useMemo(() => {
@@ -115,6 +121,7 @@ export default function PositionsPage() {
                     totalPages={totalPages}
                     onPageChange={setCurrentPage}
                     isLoading={isLoading}
+                    ethPriceUSD={ethPriceUSD}
                   />
                 </CardContent>
               </Card>

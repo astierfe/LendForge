@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReadContract } from "wagmi";
-import { parseEther, formatUnits } from "viem";
-import { useUserPosition, formatters } from "./useUserPosition";
-import { HEALTH_FACTOR } from "@/lib/contracts/config";
-import { CONTRACTS, TOKENS } from "@/lib/contracts/addresses";
+import { useAccount, useReadContract } from "wagmi";
+import { parseEther } from "viem";
+import { useOnChainPosition } from "./useOnChainPosition";
+import { useAssetConfigs } from "@/lib/utils/assetConfig";
+import {
+  calculateWeightedLTV,
+  POSITION_READ_ABIS,
+} from "@/lib/utils/position";
+import { HEALTH_FACTOR, GLOBAL_LIQUIDATION_THRESHOLD } from "@/lib/contracts/config";
+import { CONTRACTS } from "@/lib/contracts/addresses";
 
 export interface BorrowSimulationResult {
   /** Simulated health factor after borrow */
@@ -29,6 +34,11 @@ export interface BorrowSimulationResult {
 /**
  * Hook to simulate borrow operation and calculate health factor impact
  *
+ * REFACTORED v6.1.1: Now uses 100% on-chain data (no subgraph, no hardcoded prices)
+ * - useOnChainPosition() for borrowed amount, collateral, ETH price
+ * - useAssetConfigs() for LTV, liquidation thresholds, prices (from contracts)
+ * - calculateWeightedLTV() and calculateWeightedLiquidationThreshold() utilities
+ *
  * Usage:
  * ```tsx
  * const simulation = useBorrowSimulation("0.5"); // Borrow 0.5 ETH
@@ -43,23 +53,27 @@ export interface BorrowSimulationResult {
 export function useBorrowSimulation(
   borrowAmountETH: string
 ): BorrowSimulationResult {
-  const { data: user } = useUserPosition();
+  const { address } = useAccount();
 
-  // Get ETH price from oracle
-  const { data: ethPrice } = useReadContract({
-    address: CONTRACTS.ORACLE_AGGREGATOR,
-    abi: [
-      {
-        inputs: [{ name: "asset", type: "address" }],
-        name: "getPrice",
-        outputs: [{ name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function",
-      },
-    ],
-    functionName: "getPrice",
-    args: [TOKENS.ETH], // ETH address
+  // Get on-chain position data (borrowed amount, collateral, ETH price)
+  // position.collateralUSD already handles ANO_003 workaround (amount × oraclePrice)
+  const { position } = useOnChainPosition();
+  const { borrowedETH: currentBorrowedETH, borrowedUSD: currentBorrowedUSD, ethPriceUSD, collateralUSD } = position;
+
+  // Get collateral data from contract
+  const { data: collateralData } = useReadContract({
+    address: CONTRACTS.COLLATERAL_MANAGER,
+    abi: POSITION_READ_ABIS.GET_USER_COLLATERALS,
+    functionName: "getUserCollaterals",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: 5000,
+    },
   });
+
+  // Get asset configs from contracts (LTV, liquidation threshold, prices)
+  const { configs: assetConfigs, isLoading: configsLoading } = useAssetConfigs(collateralData?.[0]);
 
   const simulation = useMemo((): BorrowSimulationResult => {
     // Default empty result
@@ -74,69 +88,31 @@ export function useBorrowSimulation(
       ethPriceUSD: null,
     };
 
-    // Must have user position
-    if (!user) {
-      return {
-        ...emptyResult,
-        warningMessage: "No position found. Please deposit collateral first.",
-      };
-    }
-
-    // Must have collateral
-    if (!user.collaterals || user.collaterals.length === 0) {
+    // Must have collateral data
+    if (!collateralData || !collateralData[0] || collateralData[0].length === 0) {
       return {
         ...emptyResult,
         warningMessage: "No collateral deposited.",
       };
     }
 
-    // Parse ETH price (8 decimals - Chainlink format)
-    if (!ethPrice) {
+    // Must have asset configs loaded
+    if (configsLoading || Object.keys(assetConfigs).length === 0) {
       return {
         ...emptyResult,
-        warningMessage: "Unable to fetch ETH price.",
+        warningMessage: "Loading asset configurations...",
       };
     }
 
-    const ethPriceUSD = parseFloat(formatUnits(ethPrice as bigint, 8));
-
-    // Parse user position data
-    const currentBorrowedETH = formatters.weiToEth(user.totalBorrowed); // 18 decimals
-
-    // Calculate weighted LTV from collaterals
-    // NOTE: col.valueUSD from subgraph is BUGGY (ANO_003: contains total position value, not individual collateral)
-    // Workaround: Calculate valueUSD ourselves using amount * price from oracle
-    let totalWeightedLTV = 0;
-
-    for (const col of user.collaterals) {
-      // Parse amount based on decimals
-      const amount = formatters.tokenToNumber(col.amount, col.asset.decimals, col.asset.symbol);
-
-      // Get price for this asset (use ETH price for ETH, $1 for stablecoins)
-      let assetPriceUSD = 1; // Default for stablecoins (USDC, DAI)
-      if (col.asset.symbol === "ETH") {
-        assetPriceUSD = ethPriceUSD;
-      }
-
-      // Calculate correct valueUSD
-      const colValueUSD = amount * assetPriceUSD;
-
-      const colLTV = col.asset.ltv / 100; // Convert percentage to decimal
-      totalWeightedLTV += colValueUSD * colLTV;
-    }
-
-    // Calculate max borrowable in USD (total theoretical max based on LTV)
-    const maxBorrowableUSD = totalWeightedLTV;
+    // Calculate weighted LTV (max borrowable in USD)
+    const totalWeightedLTV = calculateWeightedLTV(collateralData, assetConfigs);
 
     // Calculate available to borrow (subtract current borrowed)
-    const currentBorrowedUSD = currentBorrowedETH * ethPriceUSD;
-    const availableToBorrowUSD = Math.max(0, maxBorrowableUSD - currentBorrowedUSD);
-    const availableToBorrowETH = availableToBorrowUSD / ethPriceUSD;
+    const availableToBorrowUSD = Math.max(0, totalWeightedLTV - currentBorrowedUSD);
+    const availableToBorrowETH = ethPriceUSD > 0 ? availableToBorrowUSD / ethPriceUSD : 0;
 
-    // Convert available to ETH bigint (this is what the user can actually borrow now)
-    const maxBorrowableETH = parseEther(
-      availableToBorrowETH.toFixed(18)
-    );
+    // Convert available to ETH bigint
+    const maxBorrowableETH = parseEther(availableToBorrowETH.toFixed(18));
 
     // Parse borrow amount
     const borrowAmount = parseFloat(borrowAmountETH || "0");
@@ -145,7 +121,7 @@ export function useBorrowSimulation(
       return {
         simulatedHealthFactor: null,
         maxBorrowableETH,
-        maxBorrowableUSD: availableToBorrowUSD, // Return available, not max total
+        maxBorrowableUSD: availableToBorrowUSD,
         isValidAmount: false,
         warningMessage: null,
         currentBorrowedETH,
@@ -157,19 +133,14 @@ export function useBorrowSimulation(
     const newTotalBorrowedETH = currentBorrowedETH + borrowAmount;
     const newTotalBorrowedUSD = newTotalBorrowedETH * ethPriceUSD;
 
-    // Calculate weighted liquidation threshold for HF calculation
-    let totalWeightedLiquidationThreshold = 0;
-    for (const col of user.collaterals) {
-      const colValueUSD = formatters.usdToNumber(col.valueUSD);
-      const colLiqThreshold = col.asset.liquidationThreshold / 100; // Convert percentage to decimal
-      totalWeightedLiquidationThreshold += colValueUSD * colLiqThreshold;
-    }
-
-    // Calculate simulated health factor
-    // HF = (totalCollateralUSD * liquidationThreshold) / totalBorrowedUSD
+    // Calculate simulated health factor using GLOBAL threshold (matches contract)
+    // Contract formula: HF = (collateralUSD * LIQUIDATION_THRESHOLD) / borrowedUSD
+    // See: contracts/libraries/HealthCalculator.sol line 24-25
+    // Note: collateralUSD from useOnChainPosition already handles ANO_003 workaround
     let simulatedHealthFactor: number | null = null;
     if (newTotalBorrowedUSD > 0) {
-      simulatedHealthFactor = totalWeightedLiquidationThreshold / newTotalBorrowedUSD;
+      const adjustedCollateral = collateralUSD * GLOBAL_LIQUIDATION_THRESHOLD;
+      simulatedHealthFactor = adjustedCollateral / newTotalBorrowedUSD;
     } else {
       simulatedHealthFactor = Infinity;
     }
@@ -200,14 +171,14 @@ export function useBorrowSimulation(
     return {
       simulatedHealthFactor,
       maxBorrowableETH,
-      maxBorrowableUSD: availableToBorrowUSD, // Return available, not max total
+      maxBorrowableUSD: availableToBorrowUSD,
       isValidAmount,
       warningMessage,
       currentBorrowedETH,
       newTotalBorrowedETH,
       ethPriceUSD,
     };
-  }, [user, borrowAmountETH, ethPrice]);
+  }, [collateralData, assetConfigs, borrowAmountETH, currentBorrowedETH, currentBorrowedUSD, ethPriceUSD, collateralUSD, configsLoading]);
 
   return simulation;
 }

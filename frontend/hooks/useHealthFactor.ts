@@ -180,54 +180,50 @@ export function useHealthFactor(): HealthFactorData | null {
 /**
  * Calculate maximum borrowable amount based on collateral
  *
- * Formula: (totalCollateralUSD * weightedLTV) - currentBorrowedUSD
+ * REFACTORED v6.1.1: Now uses on-chain asset configs instead of hardcoded prices
+ * - Requires assetConfigs from useAssetConfigs() hook
+ * - Uses actual oracle prices for all assets (not $1.00 hardcoded)
+ * - Uses on-chain LTV values (not subgraph, which may be outdated)
  *
- * @param totalCollateralUSD - Total collateral in USD (8 decimals as string) - NOT USED (buggy subgraph data)
- * @param currentBorrowed - Current borrowed amount in ETH (18 decimals as string) - NOT USED (calculated by caller)
- * @param collaterals - User collaterals for weighted LTV
- * @param ethPriceUSD - ETH price in USD (for ETH collateral calculation)
+ * Formula: Σ(collateral_value_USD × asset_LTV) for all assets
+ *
+ * @param collateralData - From getUserCollaterals() [assets, amounts, valuesUSD]
+ * @param assetConfigs - Map of asset address (lowercase) → AssetConfig (from useAssetConfigs)
  * @returns Maximum borrowable in USD (number)
+ *
+ * @deprecated This function is being replaced by calculateWeightedLTV in position.ts
+ * Consider using that instead for consistency
  */
 export function calculateMaxBorrowable(
-  totalCollateralUSD: string,
-  currentBorrowed: string,
-  collaterals: UserCollateral[],
-  ethPriceUSD: number = 2500 // Default to 2500 for backward compatibility
+  collateralData: readonly [readonly `0x${string}`[], readonly bigint[], readonly bigint[]] | undefined | null,
+  assetConfigs: Record<string, { decimals: number; priceUSD: number; ltv: number }>
 ): number {
-  if (!collaterals.length) return 0;
+  if (!collateralData) return 0;
 
-  // Calculate weighted LTV based on collateral USD values
-  // NOTE: col.valueUSD from subgraph is BUGGY (ANO_003: contains total position value, not individual collateral)
-  // Workaround: Calculate valueUSD ourselves using amount * price
+  const [assets, amounts] = collateralData;
+
+  if (!assets || !amounts || assets.length === 0) return 0;
+
   let totalWeightedLTV = 0;
 
-  for (const col of collaterals) {
-    // Parse amount based on decimals - IMPORTANT: Use correct decimals mapping
-    // Subgraph stores wrong decimals (18 for all), but USDC actually uses 6
-    // Import formatters from useUserPosition to handle this correctly
-    const actualDecimals = col.asset.symbol === "USDC" ? 6 : col.asset.decimals;
-    const amount = parseFloat(col.amount) / Math.pow(10, actualDecimals);
+  for (let i = 0; i < assets.length; i++) {
+    const assetAddress = assets[i].toLowerCase();
+    const config = assetConfigs[assetAddress];
 
-    // Get price for this asset (use ETH price for ETH, $1 for stablecoins)
-    let assetPriceUSD = 1; // Default for stablecoins (USDC, DAI)
-    if (col.asset.symbol === "ETH") {
-      assetPriceUSD = ethPriceUSD;
+    if (!config) {
+      console.warn(`[calculateMaxBorrowable] Unknown asset: ${assetAddress}`);
+      continue;
     }
 
-    // Calculate correct valueUSD
-    const colValueUSD = amount * assetPriceUSD;
+    // Parse amount with correct decimals
+    const amount = Number(amounts[i]) / Math.pow(10, config.decimals);
+    const valueUSD = amount * config.priceUSD;
+    const ltvDecimal = config.ltv / 100; // Convert percentage to decimal (66.00 → 0.66)
 
-    const colLTV = col.asset.ltv / 100; // Convert percentage to decimal
-
-    // Weight the LTV by the collateral's USD value
-    totalWeightedLTV += colValueUSD * colLTV;
+    totalWeightedLTV += valueUSD * ltvDecimal;
   }
 
-  // Calculate max borrowable using weighted LTV
-  // Note: totalWeightedLTV already accounts for the weighting, so we don't divide by collateralUSD
-  const maxBorrowableUSD = totalWeightedLTV;
-
-  return maxBorrowableUSD; // Return max borrowable in USD
+  return totalWeightedLTV; // Max borrowable in USD
 }
 
 /**

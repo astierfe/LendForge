@@ -1,7 +1,7 @@
 # LendForge - Roadmap Développement
 
-**Version actuelle:** v6.0.3
-**Dernière mise à jour:** 9 novembre 2025
+**Version actuelle:** v6.1.0
+**Dernière mise à jour:** 10 novembre 2025
 
 ---
 
@@ -96,39 +96,55 @@
 
 **Frontend Phase 6A: - End-to-end Testing** ✅ (v6.0.3)
 - 3 scénarios testes : 1.Liquidation Bot End-to-End, 2. REPAY Flow (Partiel + Total) et 3.Gains Scenario (Price Increase)
-Resultat :  
+Resultat :
 - Bot détecte et liquide positions risquées en < 2 minutes
 - REPAY flow fonctionne (partiel + total) sans erreurs
 - Frontend Dashboard + Analytics 100% cohérents après chaque transaction
-- Aucun nouveau bug critique découvert (ou documenté si trouvé) 
+- Aucun nouveau bug critique découvert (ou documenté si trouvé)
+
+**Frontend Phase 6B - Critical Bug Fixes** ✅ (v6.1.0)
+- **ANO_009 RESOLVED:** Cross-user data contamination (subgraph + Apollo cache)
+  - Centralized entity creation (`subgraph/src/helpers.ts`)
+  - Added INACTIVE position status, address normalization lowercase
+  - Disabled Apollo cache (network-only fetchPolicy)
+  - Clean deployment startBlock 9598500
+- **Oracle price integration:** Fixed USDC/DAI hardcoded $1.00 → fetch from OracleAggregator
+- **PositionsTable fix:** Borrowed amount display (Wei → ETH, not USD)
+- **Documentation:** Created JSON format (`KNOWN_ISSUES_ANO.json`, `ANO_*.json`)
+- **CLAUDE.md:** Compressed 500→152 lines (machine-readable only)
 
 ---
 
-## 🎯 Prochaine Priorité: Phase 6B - Code Quality & Refactoring
+## 🎯 Prochaine Priorité: Iteration 2 - Oracle Improvements
 
-**Objectif:** Eliminate hardcoded values, centralize calculations, and establish utility layer architecture across frontend, bot, contracts, and subgraph to prepare for production and future asset expansion.
+**Décision:** Skip Phase 6C/6D (contract fixes) + EVO_002 (multi-positions) → Focus oracle realism
 
-**Why Now:**
-- Phase 6A revealed ~30 instances of code duplication (decimals, formulas, conversions)
-- ANO_014 fix (v6.0.2) created `lib/utils/tvl.ts` as proof-of-concept for refactoring benefits
-- Current hardcoded values (ETH=$2500, decimals=18/6) scattered across 15+ files create maintenance burden
-- **Mainnet blocker:** Production deployment requires centralized price fetching and consistent formula execution
+**Objectif Iteration 2:**
+1. **EVO_001** - Real Price Injection System (2-3 weeks)
+2. **EVO_003** - UniswapV3 Oracle Deployment (1-2 weeks)
 
-**Success Criteria:**
-- Zero magic numbers (18, 6, 1e8, 1e18) in business logic
-- Zero duplicated formulas (HF, TVL, USD conversion) - single source of truth per calculation
-- All regression tests pass with identical results before/after refactor
-- New asset addition (e.g., LINK) requires only updating constants, not touching 8+ files
+**Rationale:**
+- **Production readiness:** Real oracle data required for realistic testing & demos
+- **Testnet realism:** Mock prices ($0.60 USDC) unrealistic, need mainnet data injection
+- **Learning value:** Mainnet data fetching, oracle integration, TWAP calculations
+- **ANO_008 acceptable:** Workaround script (`scripts/transfer_liquidated_collateral.sh`) sufficient for testnet
+- **Quick wins:** EVO_001 + EVO_003 = 3-5 weeks (vs EVO_002 = 4-5 weeks alone)
 
-**Scope:**
-1. **Frontend utilities** (calculations, prices, formatting, constants) - Week 1-2
-2. **Bot utilities** (conversions, calculations, constants) - Week 3
-3. **Documentation & validation** - Week 4
-4. **Contracts/Subgraph** (deferred unless duplication audit reveals critical issues)
+**EVO_001 - Real Price Injection System:**
+- Fetch mainnet prices (Chainlink + Uniswap V3) via Python collection script
+- Store in SQLite database (24h-7d historical data)
+- Inject into Sepolia mock providers via Foundry (`cast send` automation)
+- Cron job: Update prices every 5-10 minutes
+- Enable: Realistic volatility testing, deviation scenarios, emergency mode triggers
 
-**Estimated Duration:** 3-4 weeks | **Priority:** High (pre-mainnet requirement)
+**EVO_003 - UniswapV3 Oracle Deployment:**
+- Deploy real UniswapV3PriceProvider contracts (code exists, 225+ tests passing)
+- Identify liquid Sepolia pools (ETH/USDC, ETH/DAI) or use mainnet forks
+- Configure 30-minute TWAP windows
+- Register in PriceRegistry as fallback providers
+- Test deviation-based fallback (>5% triggers Uniswap TWAP instead of Chainlink)
 
-See detailed implementation plan in ANO_007 and "Phase 6B" section below.
+**Estimated Duration:** 3-5 weeks total (EVO_001: 2-3w, EVO_003: 1-2w)
 
 ---
 
@@ -152,152 +168,58 @@ See detailed implementation plan in ANO_007 and "Phase 6B" section below.
 
 ### Phase 6A: End-to-End Testing ✅ (Complété v6.0.2)
 
-### Phase 6B: Code Quality & Refactoring ⏳ (En cours v6.0.2+)
+### Phase 7: EVO_001 + EVO_003 - Oracle Improvements ⏳ (Iteration 2 - En cours)
 
-**Objectif:** Eliminate code duplication, centralize constants/calculations, establish production-grade utility architecture across all layers (frontend, bot, contracts, subgraph).
+**Week 1-2: EVO_001 - Real Price Injection System**
+- [ ] Design architecture: Python collector → SQLite → Foundry injection
+- [ ] Create database schema (assets, prices, timestamps, sources)
+- [ ] Python collector script:
+  - [ ] Fetch Chainlink mainnet feeds (ETH/USD, USDC/USD, DAI/USD)
+  - [ ] Fetch Uniswap V3 TWAP (ETH/USDC pool 0x88e6A0c..., ETH/DAI pool)
+  - [ ] Store in SQLite with 5-min granularity
+- [ ] Foundry injection script:
+  - [ ] Read latest prices from database
+  - [ ] `cast send` to update MockUSDCProvider, MockDAIProvider, MockUniswapFallback
+  - [ ] Handle gas estimation, nonce management
+- [ ] Cron job setup (every 5-10 minutes)
+- [ ] Testing: Verify realistic volatility, deviation triggers
 
-**Status:** Partial (15% complete) - `lib/utils/tvl.ts` (v6.0.2) + `lib/utils/position.ts` (v6.0.3) + `hooks/useOnChainPosition.ts` (v6.0.3)
+**Week 3: EVO_003 - UniswapV3 Oracle Deployment**
+- [ ] Identify liquid Sepolia pools (or use mainnet fork testing)
+- [ ] Deploy UniswapV3PriceProvider for ETH/USDC (30-min TWAP)
+- [ ] Deploy UniswapV3PriceProvider for ETH/DAI (30-min TWAP)
+- [ ] Register in PriceRegistry as fallback providers
+- [ ] Configure deviation thresholds (5% warning, 10% emergency)
+- [ ] Integration tests: Trigger fallback manually, verify emergency mode
+- [ ] Update frontend: Remove "Mock" labels from OraclePricesCard
 
-**Architecture Plan:**
-
-**Frontend Utilities** (`frontend/lib/utils/`)
-- ✅ `tvl.ts` - TVL calculations with correct decimal handling (created v6.0.2)
-- ✅ `position.ts` - **LTV calculation, collateral USD parsing (ANO_003 workaround), borrowed amount parsing (created v6.0.3)**
-- ✅ `index.ts` - **Barrel exports for utils (created v6.0.3)**
-- 📝 `calculations.ts` - Health Factor, max borrow/withdraw, weighted LTV/LT formulas
-- 📝 `prices.ts` - USD conversion, price parsing, decimal handling
-- 📝 `formatting.ts` - formatUSD, formatTokenAmount, formatPercentage, formatCompactNumber
-- 📝 `constants.ts` - ASSET_DECIMALS, LTV_RATIOS, LIQUIDATION_THRESHOLDS, HF_THRESHOLDS
-
-**Bot Utilities** (`bot/src/utils/`)
-- 📝 `conversions.py` - wei_to_usd, parse_collateral_amount (eliminate `(amount * price) // 10**18` duplication)
-- 📝 `calculations.py` - calculate_health_factor, calculate_liquidation_profit (same formulas as frontend)
-- 📝 `constants.py` - ASSET_DECIMALS, LTV_RATIOS (centralize config instead of scattered in 4 modules)
-
-**Contracts** (audit-dependent)
-- 📝 `libraries/HealthFactorLib.sol` - Only if HF duplicated in LendingPool + CollateralManager
-- 📝 `libraries/Constants.sol` - Centralize thresholds/decimals (if duplication found)
-
-**Subgraph** (deferred to ANO_004 fix)
-- 📝 `src/utils/calculations.ts` - convertToUSD for decimal normalization
-- 📝 `src/utils/constants.ts` - ASSET_DECIMALS mapping
-
-**Implementation Tasks:**
-
-**Week 1: Audit & Create**
-- [ ] Grep audit: Find all `18`, `6`, `1e8`, `1e18`, `10 ** 18` instances
-- [ ] Create 4 frontend utilities (calculations, prices, formatting, constants)
-- [ ] Create 3 bot utilities (conversions, calculations, constants)
-- [ ] Write unit tests for all functions
-
-**Week 2: Frontend Refactoring**
-- [ ] Replace hardcoded decimals (18/6) with `ASSET_DECIMALS[symbol]` (15+ instances)
-- [ ] Replace duplicated HF formula with `calculateHealthFactor()` (6 files)
-- [ ] Replace Wei→USD conversions with `convertToUSD()` (10+ instances)
-- [ ] Replace max borrow/withdraw logic with shared utilities (3 hooks)
-- [ ] Regression test all flows (deposit, borrow, repay, withdraw)
-
-**Week 3: Bot Refactoring**
-- [ ] Replace `(amount * price) // (10 ** 18)` with `wei_to_usd()` (5 instances)
-- [ ] Centralize decimal handling in `conversions.py` (eliminate hardcoded 18/6)
-- [ ] Use shared `calculate_health_factor()` from `calculations.py`
-- [ ] Update bot tests to use new utilities
-
-**Week 4: Validation**
-- [ ] JSDoc/docstrings for all utilities with examples
-- [ ] Create `PHASE_6B_COMPLETION_REPORT.md`
-- [ ] Verify consistency: Same inputs → Same outputs across frontend/bot
-- [ ] Performance benchmark: No regression in calculation speed
-
-**Benefits:**
-- **Maintainability:** Price change = 1 constant update (not 8 files)
-- **Evolvability:** New asset (LINK) = 1 line in constants (not 15+ files)
-- **Testability:** Unit test `calculateHealthFactor()` once with 100% coverage
-- **Consistency:** Frontend HF = Bot HF = Contract HF (same formula, zero drift)
-- **Production-Ready:** Centralized price fetching required for mainnet launch
-
-**Related:** ANO_007 (detailed plan), ANO_014 (TVL fix proof-of-concept), EVO_001 (price injection integration)
+**Week 4-5: Testing & Documentation**
+- [ ] E2E scenarios: Flash crash protection, manipulation resistance
+- [ ] Historical replay: ETH -30% crash, observe TWAP smoothing
+- [ ] Bot integration: Liquidations with real price volatility
+- [ ] Documentation: EVO_001+003 completion report
+- [ ] Demo preparation: Screenshots of real price charts, deviation events
 
 ---
 
-### Phase 6C: Smart Contracts Fixes 📅 (Préparation, Déploiement si Blindé)
+### Phase 6C/6D: Contract & Subgraph Fixes 📅 (Deferred - Pre-Production Only)
 
-**Objectif:** Corriger ANO_002 (decimals) et ANO_003 (valueUSD per-asset) dans smart contracts. **Déploiement uniquement après validation Phase 6A+6B.**
+**Status:** DEFERRED - ANO_008 workaround acceptable for testnet (`scripts/transfer_liquidated_collateral.sh`)
 
-**Modifications Requises:**
-
-**1. Fix ANO_002: Asset Decimals Event**
-- Fichier: `contracts/CollateralManager.sol`
-- Event actuel: `event AssetAdded(address indexed asset, uint256 liquidationThreshold, bool isActive)`
-- Event modifié: `event AssetAdded(address indexed asset, uint8 decimals, uint256 liquidationThreshold, bool isActive)`
-- Modifier `addAsset()` pour émettre decimals
-- Impact subgraph: Handler `handleAssetAdded()` peut parser decimals correctement
-
-**2. Fix ANO_003: Per-Asset Collateral Value**
-- Fichier: `contracts/CollateralManager.sol`
-- Ajouter fonction:
-```solidity
-function getAssetValueUSD(address user, address asset) external view returns (uint256) {
-    uint256 amount = collateralBalances[user][asset];
-    uint256 price = priceRegistry.getPrice(asset);
-    return (amount * price) / (10 ** IERC20Metadata(asset).decimals());
-}
-```
-- Impact subgraph: Handler peut fetch valueUSD per-asset au lieu de total position
-
-**3. Impact Analysis**
-- Couplage faible: Pas de modification ABI breaking (ajout de fonctions, pas suppression)
-- Paramétrage: Aucun changement config (liquidation thresholds, oracles inchangés)
-- Migration: Positions existantes compatibles (pas de storage layout change)
-
-**Déploiement:**
-- [ ] Valider tests unitaires contracts (npm test)
-- [ ] Déployer sur Sepolia: CollateralManager v1.2
-- [ ] Update frontend .env: NEXT_PUBLIC_COLLATERAL_MANAGER_ADDRESS
-- [ ] Update subgraph subgraph.yaml: CollateralManager address + startBlock
-- [ ] Redeploy subgraph v3.1 avec handlers ANO_002/003 fixes
-- [ ] Supprimer workarounds frontend (ASSET_DECIMALS mapping, ANO_003 calculations)
-
-**Critères Go/No-Go Déploiement:**
-- ✅ Phase 6A tests passed (bot + repay validés)
-- ✅ Phase 6B refactoring done (code maintenable)
-- ✅ Aucun bug critique en cours
-- ✅ Backup addresses contracts v1.1 documentées
+**Tasks (if mainnet launch planned):**
+- [ ] ANO_008: Add `CollateralManager.seizeCollateral()`
+- [ ] ANO_006: Add pool liquidity validation
+- [ ] ANO_002/003: Fix decimals event + per-asset valueUSD
+- [ ] ANO_001/004/005: Subgraph fixes (activePositions, TVL, historical prices)
 
 ---
 
-### Phase 6D: Subgraph Fixes (v3.1) 📅 (Après 6C ou en parallèle)
-
-**Objectif:** Corriger ANO_001, ANO_004, ANO_005 dans subgraph (sans redeployer contracts).
-
-**Tasks:**
-- [ ] Fix ANO_001: activePositions counter → handler user-position.ts
-- [ ] Fix ANO_004: currentTVL USD normalization → global-metrics.ts
-- [ ] Fix ANO_005: Add ethPriceUSD, tvlUSD, borrowedUSD fields → DailyMetric schema + daily-metrics.ts
-- [ ] Deploy subgraph v3.1
-- [ ] Remove frontend workarounds (ethPriceFromGlobal parameter, manual TVL calculation)
-
----
-
-### Phase 7: Oracles Réels Sepolia (Optionnel - 2-3h)
-- [ ] Rechercher Chainlink feeds non-stale (USDC/DAI)
-- [ ] Vérifier pools Uniswap V3 Sepolia actifs
-- [ ] Déployer providers si disponibles
-- [ ] Mise à jour PriceRegistry via updatePrimaryProvider()
-- [ ] **Note :** Faible priorité, graphiques CoinGecko suffisants pour portfolio
-
-### Phase 7: Tests Avancés (Optionnel - 2-3 jours)
-- [ ] Scénario oracle deviation > 10%
-- [ ] Test emergency mode activation
-- [ ] Multiple users simultanés
-- [ ] Stress test liquidations multiples
-
-### Phase Finale: Documentation Finale
-- [ ] README principal avec quick start
-- [ ] Architecture diagram (contracts, bot, subgraph, frontend)
-- [ ] Deployment guide complet
-- [ ] Video demo (optionnel)
-- [ ] Portfolio presentation notes
+### Phase Finale: Documentation & Portfolio Preparation
+- [ ] Update README with multi-position feature
+- [ ] Architecture diagram update (position IDs flow)
+- [ ] Record demo video (3-5 min): Deposit → Multiple positions → Isolated liquidation
+- [ ] Portfolio presentation notes: Technical challenges, architecture decisions
+- [ ] Deployment guide for reviewers
 
 ---
 
@@ -318,7 +240,7 @@ DAI_ADDRESS = "0x2fa332e8337642891885453fd40a7a7bb010b71a"
 - OracleAggregator: `0x62f41B1EDc66bC46e05c34AC40B447E5A7ab3EAe`
 
 ### The Graph Endpoint
-- Subgraph v5.0.0: https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
+- Subgraph v6.1.6: https://api.studio.thegraph.com/query/122308/lendforge-v-4/version/latest
 
 ---
 
