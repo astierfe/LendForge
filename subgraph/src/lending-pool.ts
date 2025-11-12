@@ -164,8 +164,10 @@ export function handleRepaid(event: Repaid): void {
 }
 
 export function handleLiquidated(event: Liquidated): void {
-  let user = getOrCreateUser(event.params.user.toHexString().toLowerCase(), event.block.timestamp)
-  let position = getOrCreatePosition(user.id, event.block.timestamp)
+  // WORKAROUND: LendingPool.sol:201 emits Liquidated(liquidator, user) instead of (user, liquidator)
+  // So we swap the params here to match the intended event signature
+  let liquidatedUser = getOrCreateUser(event.params.liquidator.toHexString().toLowerCase(), event.block.timestamp)
+  let position = getOrCreatePosition(liquidatedUser.id, event.block.timestamp)
 
   // Update position
   position.status = "LIQUIDATED"
@@ -176,24 +178,24 @@ export function handleLiquidated(event: Liquidated): void {
   position.save()
 
   // Update user
-  user.totalBorrowed = ZERO_BI
-  user.totalCollateralUSD = ZERO_BI
-  user.liquidationCount = user.liquidationCount + 1
+  liquidatedUser.totalBorrowed = ZERO_BI
+  liquidatedUser.totalCollateralUSD = ZERO_BI
+  liquidatedUser.liquidationCount = liquidatedUser.liquidationCount + 1
 
   // FIX: Decrement user's activePositions when liquidated
-  if (user.activePositions > 0) {
-    user.activePositions = user.activePositions - 1
+  if (liquidatedUser.activePositions > 0) {
+    liquidatedUser.activePositions = liquidatedUser.activePositions - 1
   }
 
-  user.updatedAt = event.block.timestamp
-  user.save()
+  liquidatedUser.updatedAt = event.block.timestamp
+  liquidatedUser.save()
 
   // Create liquidation record
   let liquidationId = event.transaction.hash.toHexString() + "-" + event.block.number.toString()
   let liquidation = new Liquidation(liquidationId)
   liquidation.position = position.id
-  liquidation.user = user.id
-  liquidation.liquidator = event.params.liquidator
+  liquidation.user = liquidatedUser.id
+  liquidation.liquidator = event.params.user
   liquidation.debtRepaid = event.params.debtRepaid
   liquidation.collateralSeizedUSD = event.params.collateralSeized  // Now in USD
   liquidation.timestamp = event.block.timestamp
@@ -205,7 +207,7 @@ export function handleLiquidated(event: Liquidated): void {
   // Create transaction
   createTransaction(
     position,
-    user,
+    liquidatedUser,
     "LIQUIDATION",
     event.params.debtRepaid,
     event.block.timestamp,
@@ -223,11 +225,11 @@ export function handleLiquidated(event: Liquidated): void {
   global.updatedAt = event.block.timestamp
   global.save()
 
-  // Update daily metrics
+  // Update daily metrics (params swapped due to contract bug)
   updateDailyMetricOnLiquidate(
     event.block.timestamp,
     event.params.debtRepaid,
-    user.id,
-    event.params.liquidator.toHexString().toLowerCase()
+    liquidatedUser.id,
+    event.params.user.toHexString().toLowerCase()  // This is actually the liquidator
   )
 }

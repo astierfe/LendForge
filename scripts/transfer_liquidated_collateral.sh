@@ -80,9 +80,8 @@ transfer_collateral() {
     echo "  Transferring $symbol to liquidator..."
 
     if [ "$asset" == "$ETH_ADDRESS" ]; then
-        # Transfer ETH
-        cast send $LIQUIDATOR \
-            --value $balance \
+        # Transfer ETH (to EOA, needs empty calldata)
+        cast send --value $balance $LIQUIDATOR "" \
             --private-key $USER_KEY \
             --rpc-url $SEPOLIA_RPC_URL \
             --gas-limit 100000

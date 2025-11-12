@@ -10,7 +10,7 @@ load_dotenv(project_root / ".env")
 class Config:
     # Blockchain
     SEPOLIA_RPC_URL = os.getenv("SEPOLIA_RPC_URL")
-    PRIVATE_KEY = os.getenv("PRIVATE_KEY")
+    PRIVATE_KEY = os.getenv("LIQUIDATOR_PRIVATE_KEY")  # Use liquidator key, not deployer
 
     # ===== NEW CONTRACTS (v3.1) =====
     LENDING_POOL_ADDRESS = os.getenv("LENDING_POOL_ADDRESS")  # v3.0
