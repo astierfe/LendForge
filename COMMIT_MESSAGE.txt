@@ -1,0 +1,70 @@
+fix(v6.3.1): Validate ANO_008 workaround script v2.0 with proportional multi-asset liquidation
+
+## Summary
+Validated proportional liquidation transfer script (ANO_008 workaround v2.0) with successful testnet execution. Script now correctly distributes seized collateral across multiple assets based on USD value proportions, preventing over-liquidation and preserving user's remaining collateral.
+
+## Changes
+
+### Script Enhancements (scripts/transfer_liquidated_collateral.sh)
+- **Python-based calculations**: Replaced `bc` dependency with Python for Windows/Git Bash compatibility
+- **JSON event parsing**: Added Python-based log extraction to correctly identify LendingPool's Liquidated event among multiple logs
+- **ETH→USD conversion**: Fixed contract's ETH-denominated collateralSeized (18 decimals) conversion to USD for multi-asset distribution
+- **Proportional seize calculation**:
+  - Calculate USD value per asset: `balance × oraclePrice`
+  - Distribute total seize amount proportionally: `(totalSeizeUSD × assetValueUSD) / totalCollateralUSD`
+  - Convert back to token amounts: `seizeUSD / oraclePrice`
+- **Decimal handling**: Fixed bash arithmetic overflow for large numbers (replaced `10**18` with case-based divisors)
+
+### Test Results (Transaction: 0xb0ccc32546...)
+**Input:**
+- Total collateral: 600 DAI ($120 @ $0.20) + 0.5 ETH ($1725 @ $3450) = $1845
+- Debt: 0.45 ETH = $1552.50
+- Expected seize: $1707.75 (debt + 10% bonus)
+
+**Output:**
+- ✅ Seized: 555.365 DAI ($111.07) + 0.463 ETH ($1596.68) = $1707.75 total
+- ✅ User retained: 44.635 DAI + 0.037 ETH = $136.58 (7.4% of original collateral)
+- ✅ Proportional distribution: 6.5% DAI / 93.5% ETH based on USD values
+
+### Documentation Updates
+- **CLAUDE.md**: Updated to v6.3.1 with validated script status and test results
+- **KNOWN_ISSUES_ANO.json**: Changed ANO_008 status to "VALIDATED" with testnet proof
+- **ANO_008_liquidation-missing-collateral-transfer.md**:
+  - Added validated test case section with transaction details
+  - Documented 7 key improvements (Python calculations, JSON parsing, ETH conversion, etc.)
+  - Updated proportional calculation formulas
+
+## Technical Details
+
+### Event Parsing Fix
+**Problem**: Script extracted wrong event (Oracle's PriceFeedUpdated instead of LendingPool's Liquidated) due to inadequate filtering.
+
+**Solution**: Python-based JSON parsing with dual conditions:
+```python
+for log in receipt['logs']:
+    if log['address'].lower() == lending_pool.lower():
+        if log['topics'][0] == liquidated_topic:
+            return log['data']
+```
+
+### Calculation Pipeline
+1. **Extract from event**: `collateralSeized` (ETH, 18 dec) → Convert to USD using oracle price
+2. **Per-asset proportion**: `assetValueUSD / totalCollateralUSD`
+3. **Seize amount in USD**: `collateralSeizeUSD × proportion`
+4. **Convert to tokens**: `seizeUSD × 10^8 / oraclePrice` (accounting for 8-decimal price format)
+
+### Known Limitations (Temporary Workaround)
+- ❌ Requires USER's private key (testing only - cannot be used with real users)
+- ❌ Manual execution required after bot liquidation
+- ❌ Double gas costs (~1.2M total vs ~600k for automated transfer)
+- ✅ Correctly implements proportional seizure per DeFi standards
+
+## Next Steps
+1a.transfer_liquidated_collateral.sh must handle both partial and full liquidations for any user, not just USER_ADDRESS (see .env at project root).
+1b. The script’s logs must clearly show each transaction executed and its result.
+2 The Python bot (bot/src/main.py) must automatically trigger transfer_liquidated_collateral.sh.
+
+## References
+- Test transaction: https://sepolia.etherscan.io/tx/0xb0ccc32546f59435cb6ebc281e62d59bec8c10e083245b13a306b331c2897f45
+- Related issues: ANO_010 (subgraph event inversion), ANO_006 (liquidity validation)
+- Documentation: _docs/issues/ANO_008_liquidation-missing-collateral-transfer.md
